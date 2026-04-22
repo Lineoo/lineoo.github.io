@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>颜色转换器 | Color Converter</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/fontsource-inter@5.0.19/index.min.css" rel="stylesheet">
+<style>
+  :root { font-family: 'Inter', system-ui, sans-serif; }
+  body { background: #0f1117; color: #e2e8f0; }
+  .color-card {
+    background: #1a1d27;
+    border: 1px solid #2a2d3a;
+    border-radius: 12px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .color-card:hover { border-color: #4a4d5a; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+  .color-preview {
+    width: 100%;
+    height: 120px;
+    border-radius: 10px;
+    border: 2px solid #3a3d4a;
+    transition: background-color 0.2s;
+  }
+  input[type="color"] {
+    -webkit-appearance: none;
+    border: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    cursor: pointer;
+    background: none;
+    padding: 0;
+  }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+  input[type="color"]::-webkit-color-swatch { border: 2px solid #3a3d4a; border-radius: 8px; }
+  .input-field {
+    background: #0f1117;
+    border: 1px solid #2a2d3a;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #e2e8f0;
+    font-size: 14px;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+  .input-field:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.3); }
+  .copy-btn {
+    background: #2a2d3a;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    color: #94a3b8;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .copy-btn:hover { background: #3a3d4a; color: #e2e8f0; }
+  .copy-btn.copied { background: #059669; color: #fff; }
+  .label-text { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #64748b; font-weight: 600; margin-bottom: 4px; }
+  .gradient-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(to right, 
+      hsl(0,80%,60%), hsl(30,80%,60%), hsl(60,80%,60%), 
+      hsl(120,80%,60%), hsl(180,80%,60%), hsl(240,80%,60%), 
+      hsl(300,80%,60%), hsl(360,80%,60%));
+    margin-bottom: 24px;
+  }
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #059669;
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: transform 0.3s ease;
+    z-index: 50;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .slider-track { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 3px; background: #2a2d3a; outline: none; }
+  .slider-track::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #6366f1; cursor: pointer; border: 2px solid #1a1d27; }
+  .slider-hue { background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00) !important; }
+  .slider-lightness { background: linear-gradient(to right, #000, var(--hue-color)) !important; }
+  .slider-chroma { background: linear-gradient(to right, var(--lc-bg), #ccc) !important; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<div class="max-w-5xl mx-auto px-4 py-8">
+  <!-- Header -->
+  <div class="text-center mb-8">
+    <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+      颜色转换器
+    </h1>
+    <p class="text-slate-400 text-sm">sRGB · Linear RGB · HSL · OKLCH 色彩空间互转</p>
+  </div>
+
+  <div class="gradient-bar"></div>
+
+  <!-- Main Layout -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    
+    <!-- Left Column: Picker & Preview -->
+    <div class="space-y-6">
+      <!-- Color Picker -->
+      <div class="color-card p-6">
+        <div class="flex items-center gap-4 mb-6">
+          <input type="color" id="colorPicker" value="#6366f1">
+          <div>
+            <div class="label-text mb-1">选择颜色</div>
+            <p class="text-sm text-slate-400">使用拾色器选择颜色</p>
+          </div>
+        </div>
+        <div id="preview" class="color-preview mb-4"></div>
+        
+        <!-- Hex Input -->
+        <div class="flex items-center gap-2">
+          <div class="flex-1">
+            <div class="label-text mb-1">HEX</div>
+            <input type="text" id="hexInput" class="input-field font-mono" value="#6366f1" maxlength="9">
+          </div>
+          <button class="copy-btn mt-5" onclick="copyText(document.getElementById('hexInput').value, this)">复制</button>
+        </div>
+      </div>
+
+      <!-- sRGB -->
+      <div class="color-card p-6">
+        <div class="label-text mb-3">sRGB (8-bit)</div>
+        <div class="grid grid-cols-3 gap-3 mb-3">
+          <div>
+            <label class="label-text" style="color:#f87171">R</label>
+            <input type="number" id="srgbR" class="input-field font-mono" min="0" max="255" value="99">
+          </div>
+          <div>
+            <label class="label-text" style="color:#4ade80">G</label>
+            <input type="number" id="srgbG" class="input-field font-mono" min="0" max="255" value="102">
+          </div>
+          <div>
+            <label class="label-text" style="color:#60a5fa">B</label>
+            <input type="number" id="srgbB" class="input-field font-mono" min="0" max="255" value="241">
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex-1">
+            <div class="label-text mb-1">sRGB CSS</div>
+            <input type="text" id="srgbCSS" class="input-field font-mono" value="rgb(99, 102, 241)" readonly>
+          </div>
+          <button class="copy-btn mt-5" onclick="copyText(document.getElementById('srgbCSS').value, this)">复制</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Other Color Spaces -->
+    <div class="space-y-6">
+      
+      <!-- Linear RGB -->
+      <div class="color-card p-6">
+        <div class="label-text mb-3">Linear RGB</div>
+        <div class="grid grid-cols-3 gap-3 mb-3">
+          <div>
+            <label class="label-text">R</label>
+            <input type="number" id="linR" class="input-field font-mono" step="0.001" value="0.132">
+          </div>
+          <div>
+            <label class="label-text">G</label>
+            <input type="number" id="linG" class="input-field font-mono" step="0.001" value="0.136">
+          </div>
+          <div>
+            <label class="label-text">B</label>
+            <input type="number" id="linB" class="input-field font-mono" step="0.001" value="0.628">
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex-1">
+            <div class="label-text mb-1">Linear RGB CSS</div>
+            <input type="text" id="linCSS" class="input-field font-mono" readonly>
+          </div>
+          <button class="copy-btn mt-5" onclick="copyText(document.getElementById('linCSS').value, this)">复制</button>
+        </div>
+      </div>
+
+      <!-- HSL -->
+      <div class="color-card p-6">
+        <div class="label-text mb-3">HSL</div>
+        <div class="grid grid-cols-3 gap-3 mb-3">
+          <div>
+            <label class="label-text">H (°)</label>
+            <input type="number" id="hslH" class="input-field font-mono" min="0" max="360" step="0.1" value="239">
+          </div>
+          <div>
+            <label class="label-text">S (%)</label>
+            <input type="number" id="hslS" class="input-field font-mono" min="0" max="100" step="0.1" value="84">
+          </div>
+          <div>
+            <label class="label-text">L (%)</label>
+            <input type="number" id="hslL" class="input-field font-mono" min="0" max="100" step="0.1" value="67">
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex-1">
+            <div class="label-text mb-1">HSL CSS</div>
+            <input type="text" id="hslCSS" class="input-field font-mono" readonly>
+          </div>
+          <button class="copy-btn mt-5" onclick="copyText(document.getElementById('hslCSS').value, this)">复制</button>
+        </div>
+      </div>
+
+      <!-- OKLCH -->
+      <div class="color-card p-6">
+        <div class="label-text mb-3">OKLCH</div>
+        <div class="grid grid-cols-3 gap-3 mb-3">
+          <div>
+            <label class="label-text">L</label>
+            <input type="number" id="oklchL" class="input-field font-mono" min="0" max="1" step="0.001" value="0.547">
+          </div>
+          <div>
+            <label class="label-text">C</label>
+            <input type="number" id="oklchC" class="input-field font-mono" min="0" max="0.4" step="0.001" value="0.257">
+          </div>
+          <div>
+            <label class="label-text">H (°)</label>
+            <input type="number" id="oklchH" class="input-field font-mono" min="0" max="360" step="0.1" value="260.8">
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex-1">
+            <div class="label-text mb-1">OKLCH CSS</div>
+            <input type="text" id="oklchCSS" class="input-field font-mono" readonly>
+          </div>
+          <button class="copy-btn mt-5" onclick="copyText(document.getElementById('oklchCSS').value, this)">复制</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Color Palette -->
+  <div class="color-card p-6 mt-6">
+    <div class="label-text mb-4">调色板预览</div>
+    <div id="palette" class="flex gap-2 flex-wrap"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast">✓ 已复制到剪贴板</div>
+
+<script>
+// ===== Color Conversion Utilities =====
+
+function clamp(v, min = 0, max = 1) { return Math.min(max, Math.max(min, v)); }
+
+function srgbToLinear(c) {
+  c = c / 255;
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+function linearToSrgb(c) {
+  c = clamp(c);
+  const v = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  return Math.round(clamp(v) * 255);
+}
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) {
+    h = s = 0;
+  } else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return [h * 360, s * 100, l * 100];
+}
+
+function hslToRgb(h, s, l) {
+  h /= 360; s /= 100; l /= 100;
+  let r, g, b;
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+// OKLCH conversions (via OKLab)
+const oklabMatrix = [
+  [0.4122214708, 0.5363325363, 0.0514459929],
+  [0.2119034982, 0.6806995451, 0.1073969566],
+  [0.0883024619, 0.2817188376, 0.6299787005]
+];
+
+const oklabInvMatrix = [
+  [4.0767416621, -3.3077115913, 0.2309699292],
+  [-1.2684380046, 2.6097574011, -0.3413193965],
+  [-0.0041960863, -0.7034186147, 1.7076147010]
+];
+
+function linearSrgbToOklab(linR, linG, linB) {
+  // Linear sRGB to LMS
+  const l = 0.4122214708 * linR + 0.5363325363 * linG + 0.0514459929 * linB;
+  const m = 0.2119034982 * linR + 0.6806995451 * linG + 0.1073969566 * linB;
+  const s = 0.0883024619 * linR + 0.2817188376 * linG + 0.6299787005 * linB;
+  const l_ = Math.cbrt(l);
+  const m_ = Math.cbrt(m);
+  const s_ = Math.cbrt(s);
+  return [
+    0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+    1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+    0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+  ];
+}
+
+function oklabToLinearSrgb(L, a, b) {
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+  const l = l_ * l_ * l_;
+  const m = m_ * m_ * m_;
+  const s = s_ * s_ * s_;
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
+  ];
+}
+
+function oklchToOklab(L, C, H) {
+  const hRad = H * Math.PI / 180;
+  return [L, C * Math.cos(hRad), C * Math.sin(hRad)];
+}
+
+function oklabToOklch(L, a, b) {
+  const C = Math.sqrt(a * a + b * b);
+  let H = Math.atan2(b, a) * 180 / Math.PI;
+  if (H < 0) H += 360;
+  return [L, C, H];
+}
+
+function srgbToOklch(r, g, b) {
+  const linR = srgbToLinear(r);
+  const linG = srgbToLinear(g);
+  const linB = srgbToLinear(b);
+  const [L, a, b_] = linearSrgbToOklab(linR, linG, linB);
+  return oklabToOklch(L, a, b_);
+}
+
+function oklchToSrgb(L, C, H) {
+  const [Lab, aa, bb] = oklchToOklab(L, C, H);
+  const [linR, linG, linB] = oklabToLinearSrgb(Lab, aa, bb);
+  return [linearToSrgb(linR), linearToSrgb(linG), linearToSrgb(linB)];
+}
+
+function hexToRgb(hex) {
+  hex = hex.replace(/^#/, '');
+  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+  if (hex.length === 8) hex = hex.slice(0, 6);
+  const num = parseInt(hex, 16);
+  return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+}
+
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+
+// ===== UI Logic =====
+
+let updating = false;
+
+const els = {
+  picker: document.getElementById('colorPicker'),
+  preview: document.getElementById('preview'),
+  hexInput: document.getElementById('hexInput'),
+  srgbR: document.getElementById('srgbR'),
+  srgbG: document.getElementById('srgbG'),
+  srgbB: document.getElementById('srgbB'),
+  srgbCSS: document.getElementById('srgbCSS'),
+  linR: document.getElementById('linR'),
+  linG: document.getElementById('linG'),
+  linB: document.getElementById('linB'),
+  linCSS: document.getElementById('linCSS'),
+  hslH: document.getElementById('hslH'),
+  hslS: document.getElementById('hslS'),
+  hslL: document.getElementById('hslL'),
+  hslCSS: document.getElementById('hslCSS'),
+  oklchL: document.getElementById('oklchL'),
+  oklchC: document.getElementById('oklchC'),
+  oklchH: document.getElementById('oklchH'),
+  oklchCSS: document.getElementById('oklchCSS'),
+  palette: document.getElementById('palette')
+};
+
+function updateAllFromRgb(r, g, b, source) {
+  if (updating) return;
+  updating = true;
+
+  const clamped = [clamp(r, 0, 255), clamp(g, 0, 255), clamp(b, 0, 255)];
+  r = clamped[0]; g = clamped[1]; b = clamped[2];
+
+  const hex = rgbToHex(r, g, b);
+  const [h, s, l] = rgbToHsl(r, g, b);
+  const [linR, linG, linB] = [srgbToLinear(r), srgbToLinear(g), srgbToLinear(b)];
+  const [oL, oC, oH] = srgbToOklch(r, g, b);
+
+  // Update preview
+  els.preview.style.backgroundColor = `rgb(${r},${g},${b})`;
+  els.picker.value = hex;
+
+  // Update all fields (skip source)
+  if (source !== 'hex') els.hexInput.value = hex;
+  if (source !== 'srgb') {
+    els.srgbR.value = r; els.srgbG.value = g; els.srgbB.value = b;
+  }
+  if (source !== 'srgbCSS') els.srgbCSS.value = `rgb(${r}, ${g}, ${b})`;
+  
+  if (source !== 'linear') {
+    els.linR.value = linR.toFixed(4);
+    els.linG.value = linG.toFixed(4);
+    els.linB.value = linB.toFixed(4);
+  }
+  els.linCSS.value = `color(linear-srgb ${linR.toFixed(4)} ${linG.toFixed(4)} ${linB.toFixed(4)})`;
+
+  if (source !== 'hsl') {
+    els.hslH.value = Math.round(h * 10) / 10;
+    els.hslS.value = Math.round(s * 10) / 10;
+    els.hslL.value = Math.round(l * 10) / 10;
+  }
+  els.hslCSS.value = `hsl(${Math.round(h * 10) / 10}, ${Math.round(s * 10) / 10}%, ${Math.round(l * 10) / 10}%)`;
+
+  if (source !== 'oklch') {
+    els.oklchL.value = Math.round(oL * 1000) / 1000;
+    els.oklchC.value = Math.round(oC * 1000) / 1000;
+    els.oklchH.value = Math.round(oH * 10) / 10;
+  }
+  els.oklchCSS.value = `oklch(${Math.round(oL * 1000) / 1000} ${Math.round(oC * 1000) / 1000} ${Math.round(oH * 10) / 10})`;
+
+  // Update palette
+  updatePalette(r, g, b);
+
+  updating = false;
+}
+
+function updatePalette(r, g, b) {
+  const [h] = rgbToHsl(r, g, b);
+  const variants = [];
+  for (let i = 0; i < 12; i++) {
+    const hh = (h + i * 30) % 360;
+    const [rr, gg, bb] = hslToRgb(hh, 75, 60);
+    variants.push(`rgb(${rr},${gg},${bb})`);
+  }
+  els.palette.innerHTML = variants.map(c => 
+    `<div style="flex:1;min-width:30px;height:40px;border-radius:8px;background:${c};cursor:pointer" onclick="applyPaletteColor('${c}')"></div>`
+  ).join('');
+}
+
+function applyPaletteColor(colorStr) {
+  const match = colorStr.match(/rgb\((\d+),(\d+),(\d+)\)/);
+  if (match) {
+    updateAllFromRgb(parseInt(match[1]), parseInt(match[2]), parseInt(match[3]), 'palette');
+  }
+}
+
+// Event Listeners
+els.picker.addEventListener('input', (e) => {
+  const [r, g, b] = hexToRgb(e.target.value);
+  updateAllFromRgb(r, g, b, 'picker');
+});
+
+els.hexInput.addEventListener('input', (e) => {
+  let val = e.target.value.trim();
+  if (!val.startsWith('#')) val = '#' + val;
+  if (/^#[0-9a-fA-F]{6}$/.test(val) || /^#[0-9a-fA-F]{3}$/.test(val)) {
+    const [r, g, b] = hexToRgb(val);
+    updateAllFromRgb(r, g, b, 'hex');
+  }
+});
+
+['srgbR', 'srgbG', 'srgbB'].forEach(id => {
+  els[id].addEventListener('input', () => {
+    const r = parseInt(els.srgbR.value) || 0;
+    const g = parseInt(els.srgbG.value) || 0;
+    const b = parseInt(els.srgbB.value) || 0;
+    updateAllFromRgb(r, g, b, 'srgb');
+  });
+});
+
+['linR', 'linG', 'linB'].forEach(id => {
+  els[id].addEventListener('input', () => {
+    const lr = parseFloat(els.linR.value) || 0;
+    const lg = parseFloat(els.linG.value) || 0;
+    const lb = parseFloat(els.linB.value) || 0;
+    const r = linearToSrgb(lr);
+    const g = linearToSrgb(lg);
+    const b = linearToSrgb(lb);
+    updateAllFromRgb(r, g, b, 'linear');
+  });
+});
+
+['hslH', 'hslS', 'hslL'].forEach(id => {
+  els[id].addEventListener('input', () => {
+    const h = parseFloat(els.hslH.value) || 0;
+    const s = parseFloat(els.hslS.value) || 0;
+    const l = parseFloat(els.hslL.value) || 0;
+    const [r, g, b] = hslToRgb(h, s, l);
+    updateAllFromRgb(r, g, b, 'hsl');
+  });
+});
+
+['oklchL', 'oklchC', 'oklchH'].forEach(id => {
+  els[id].addEventListener('input', () => {
+    const L = parseFloat(els.oklchL.value) || 0;
+    const C = parseFloat(els.oklchC.value) || 0;
+    const H = parseFloat(els.oklchH.value) || 0;
+    const [r, g, b] = oklchToSrgb(L, C, H);
+    updateAllFromRgb(r, g, b, 'oklch');
+  });
+});
+
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✓ 已复制';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '复制';
+      btn.classList.remove('copied');
+    }, 1500);
+  });
+}
+
+// Initialize with default color
+updateAllFromRgb(99, 102, 241, 'init');
+</script>
+
+</body>
+</html>
+
