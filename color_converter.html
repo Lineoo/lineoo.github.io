@@ -39,6 +39,12 @@
       grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
     }
 
+    @media (max-width: 600px) {
+      .color-cards-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .color-card {
       display: flex;
       flex-flow: column;
@@ -99,9 +105,22 @@
 
     .color-card>div>div>label {
       color: #000000;
-      padding: 0 1vh;
+      padding: 0 10px;
       font-size: 11px;
-      border-radius: 8px;
+      text-overflow: clip;
+      text-wrap: nowrap;
+      transition: all 0.3s;
+      width: 10em;
+      min-width: 4px;
+      max-width: max-content;
+    }
+
+    @media (max-width: 600px) {
+      .color-card>div>div>label {
+        color: transparent;
+        padding: 0;
+        width: 0;
+      }
     }
 
     .color-card>div>div>input {
@@ -112,6 +131,7 @@
       font-size: 14px;
       flex-grow: 1;
       font-family: monospace;
+      width: 0;
     }
   </style>
 </head>
@@ -426,7 +446,7 @@
       }
 
       function rgbToHex(r, g, b) {
-        return '#' + [r, g, b].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
+        return '#' + [r, g, b].map(x => (Math.round(x * 255) & 255).toString(16).padStart(2, '0')).join('');
       }
 
       // ===== UI Logic =====
@@ -487,7 +507,7 @@
         }
 
         if (source !== 'srgb.rgb') {
-          els.srgbRgb.value = `rgb(${r.toFixed(valPrcs)}, ${g.toFixed(valPrcs)}, ${b.toFixed(valPrcs)})`;
+          els.srgbRgb.value = `rgb(${r.toFixed(valPrcs)} ${g.toFixed(valPrcs)} ${b.toFixed(valPrcs)})`;
         }
 
         if (source !== 'srgb.color') {
