@@ -117,7 +117,7 @@ input {
     max-width: max-content;
 }
 
-@container cards-grid (width < 600px) {
+@container cards-grid (width < 400px) {
     .color-card>div>div>label {
         color: transparent;
         padding: 0;
@@ -184,7 +184,7 @@ input {
         color: oklab(95% 0 0);
     }
 
-    @container cards-grid (width < 600px) {
+    @container cards-grid (width < 400px) {
         .color-card>div>div>input {
             background-color: oklab(40% 0 0);
         }

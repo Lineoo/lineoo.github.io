@@ -227,9 +227,9 @@ function updateAll(r, g, b, source) {
     }
 
     if (source !== 'srgb.uint:rgb') {
-        els.srgbUintR.value = Math.round(r * 256);
-        els.srgbUintG.value = Math.round(g * 256);
-        els.srgbUintB.value = Math.round(b * 256);
+        els.srgbUintR.value = Math.round(r * 255);
+        els.srgbUintG.value = Math.round(g * 255);
+        els.srgbUintB.value = Math.round(b * 255);
     }
 
     if (source !== 'srgb.hex') {
