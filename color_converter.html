@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js"></script>
   <title>颜色转换器</title>
   <style>
     :root {
@@ -34,15 +35,9 @@
     }
 
     .color-cards-grid {
-      display: grid;
-      gap: 20px;
-      grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
-    }
-
-    @media (max-width: 600px) {
-      .color-cards-grid {
-        grid-template-columns: 1fr;
-      }
+      position: relative;
+      container-type: inline-size;
+      container-name: cards-grid;
     }
 
     .color-card {
@@ -53,6 +48,22 @@
       border-radius: 12px;
       transition: box-shadow 0.3s;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      min-width: 300px;
+      margin-bottom: 20px;
+      box-sizing: border-box;
+    }
+
+    @container cards-grid (width > 1000px) {
+      .color-card {
+        width: calc(50% - 10px);
+      }
+    }
+
+    @container cards-grid (width > 2000px) {
+      .color-card {
+        width: calc(33% - 10px);
+      }
     }
 
     .color-card:hover {
@@ -115,7 +126,7 @@
       max-width: max-content;
     }
 
-    @media (max-width: 600px) {
+    @container cards-grid (width < 600px) {
       .color-card>div>div>label {
         color: transparent;
         padding: 0;
@@ -164,15 +175,15 @@
         <div>
           <div class="red">
             <label>8-bit</label>
-            <input type="number" id="srgb.uint:r" min="0" max="256" value="0">
+            <input type="number" id="srgb.uint:r" min="0" max="255" value="0">
           </div>
           <div class="green">
             <label>8-bit</label>
-            <input type="number" id="srgb.uint:g" min="0" max="256" value="0">
+            <input type="number" id="srgb.uint:g" min="0" max="255" value="0">
           </div>
           <div class="blue">
             <label>8-bit</label>
-            <input type="number" id="srgb.uint:b" min="0" max="256" value="0">
+            <input type="number" id="srgb.uint:b" min="0" max="255" value="0">
           </div>
         </div>
         <div>
@@ -193,11 +204,7 @@
             <input type="text" id="srgb.color" value="N/A" readonly>
           </div>
         </div>
-      </div>
-
-      <!-- Linear RGB -->
-      <div class="color-card">
-        <label>sRGB - Linear</label>
+        <label>Linear</label>
         <div>
           <div class="red">
             <label>R</label>
@@ -276,6 +283,8 @@
         </div>
       </div>
     </div>
+
+    <p>颜色转换参见：<a href="https://www.w3.org/TR/css-color-4/">CSS Color Module Level 4 (www.w3.org)</a></p>
 
     <script>
       // ===== Color Conversion =====
@@ -449,7 +458,23 @@
         return '#' + [r, g, b].map(x => (Math.round(x * 255) & 255).toString(16).padStart(2, '0')).join('');
       }
 
-      // ===== UI Logic =====
+      // ===== UI Logic =====// 
+
+      const masonry = new Masonry('.color-cards-grid', {
+        itemSelector: '.color-card',
+        columnWidth: '.color-card',
+        gutter: 20,
+        percentPosition: true,
+        transitionDuration: '0.1s'
+      });
+
+      let resizeDebounce;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeDebounce);
+        resizeDebounce = setTimeout(() => {
+          masonry.layout();
+        }, 100);
+      });
 
       let updating = false;
 
