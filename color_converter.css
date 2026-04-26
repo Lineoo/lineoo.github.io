@@ -1,0 +1,137 @@
+:root {
+    font-family: system-ui, sans-serif;
+}
+
+body {
+    display: flex;
+    flex-flow: column;
+    background: oklab(100% 0 0);
+    color: #000;
+}
+
+input {
+    border: transparent;
+    outline: transparent;
+}
+
+.content {
+    align-self: center;
+    width: 120vh;
+    max-width: 90vw;
+}
+
+.header {
+    align-self: center;
+    text-align: center;
+}
+
+.color-cards-grid {
+    position: relative;
+    container-type: inline-size;
+    container-name: cards-grid;
+}
+
+.color-card {
+    display: flex;
+    flex-flow: column;
+    padding: 10px;
+    background: oklab(95% 0 0);
+    border-radius: 12px;
+    transition: box-shadow 0.3s;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    min-width: 300px;
+    margin-bottom: 20px;
+    box-sizing: border-box;
+}
+
+@container cards-grid (width > 1000px) {
+    .color-card {
+        width: calc(50% - 10px);
+    }
+}
+
+@container cards-grid (width > 2000px) {
+    .color-card {
+        width: calc(33% - 10px);
+    }
+}
+
+.color-card:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.color-card>label {
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 1.5px;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.color-card>div {
+    display: flex;
+    justify-content: space-evenly;
+}
+
+.color-card>div>div {
+    display: flex;
+    background-color: oklab(85% 0 0);
+    box-shadow: 0 4px 4px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    align-items: center;
+    transition: outline-width 0.05s;
+    outline-style: solid;
+    outline-color: #6366f1;
+    outline-width: 0;
+    flex-grow: 1;
+    margin: 8px;
+}
+
+.color-card>div>div:focus-within {
+    outline-width: 2px;
+}
+
+.color-card>div>div.red {
+    background-color: oklch(85% 0.12 30);
+}
+
+.color-card>div>div.green {
+    background-color: oklch(85% 0.12 150);
+}
+
+.color-card>div>div.blue {
+    background-color: oklch(85% 0.12 270);
+}
+
+.color-card>div>div>label {
+    color: #000000;
+    padding: 0 10px;
+    font-size: 11px;
+    text-overflow: clip;
+    text-wrap: nowrap;
+    transition: all 0.3s;
+    width: 10em;
+    min-width: 4px;
+    max-width: max-content;
+}
+
+@container cards-grid (width < 600px) {
+    .color-card>div>div>label {
+        color: transparent;
+        padding: 0;
+        width: 0;
+    }
+}
+
+.color-card>div>div>input {
+    background: oklab(97% 0 0);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #000000;
+    font-size: 14px;
+    flex-grow: 1;
+    font-family: monospace;
+    width: 0;
+}
