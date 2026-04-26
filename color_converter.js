@@ -90,23 +90,21 @@ function hsvToSrgb(h, s, v) {
     return [r, g, b];
 }
 
-// OKLCH conversions (via OKLab)
-const oklabMatrix = [
-    [0.4122214708, 0.5363325363, 0.0514459929],
-    [0.2119034982, 0.6806995451, 0.1073969566],
-    [0.0883024619, 0.2817188376, 0.6299787005]
-];
-
-const oklabInvMatrix = [
-    [4.0767416621, -3.3077115913, 0.2309699292],
-    [-1.2684380046, 2.6097574011, -0.3413193965],
-    [-0.0041960863, -0.7034186147, 1.7076147010]
-];
-
-function srgbLinearToOklab(r, g, b) {
+function srgbLinearToLms(r, g, b) {
     const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
     const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
     const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+    return [l, m, s]
+}
+
+function lmsToSrgbLinear(l, m, s) {
+    const linR = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+    const linG = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+    const linB = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
+    return [linR, linG, linB];
+}
+
+function lmsToOklab(l, m, s) {
     const l_ = Math.cbrt(l);
     const m_ = Math.cbrt(m);
     const s_ = Math.cbrt(s);
@@ -117,18 +115,14 @@ function srgbLinearToOklab(r, g, b) {
     ];
 }
 
-function oklabToSrgbLinear(L, a, b) {
+function oklabToLms(L, a, b) {
     const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
     const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
     const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
     const l = l_ * l_ * l_;
     const m = m_ * m_ * m_;
     const s = s_ * s_ * s_;
-    return [
-        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
-    ];
+    return [l, m, s];
 }
 
 function oklchToOklab(L, C, H) {
@@ -215,7 +209,8 @@ function updateAll(r, g, b, source) {
     const hex = rgbToHex(r, g, b);
     const [h, s, l] = srgbToHsl(r, g, b);
     const [linR, linG, linB] = srgbSensitiveToLinear(r, g, b);
-    const [labL, labA, labB] = srgbLinearToOklab(linR, linG, linB);
+    const [lmsL, lmsM, lmsS] = srgbLinearToLms(linR, linG, linB);
+    const [labL, labA, labB] = lmsToOklab(lmsL, lmsM, lmsS);
     const [lchL, lchC, lchH] = oklabToOklch(labL, labA, labB);
 
     if (source !== 'srgb:rgb') {
@@ -337,7 +332,8 @@ function updateAll(r, g, b, source) {
         const H = parseFloat(els.oklchH.value) || 0;
 
         const [labL, labA, labB] = oklchToOklab(L, C, H);
-        const [linR, linG, linB] = oklabToSrgbLinear(labL, labA, labB);
+        const [lmsL, lmsM, lmsS] = oklabToLms(labL, labA, labB);
+        const [linR, linG, linB] = lmsToSrgbLinear(lmsL, lmsM, lmsS);
         const [r, g, b] = srgbLinearToSensitive(linR, linG, linB);
         updateAll(r, g, b, 'oklch:lch');
     });
@@ -349,7 +345,8 @@ function updateAll(r, g, b, source) {
         const A = parseFloat(els.oklabA.value) || 0;
         const B = parseFloat(els.oklabB.value) || 0;
 
-        const [linR, linG, linB] = oklabToSrgbLinear(L, A, B);
+        const [lmsL, lmsM, lmsS] = oklabToLms(L, A, B);
+        const [linR, linG, linB] = lmsToSrgbLinear(lmsL, lmsM, lmsS);
         const [r, g, b] = srgbLinearToSensitive(linR, linG, linB);
         updateAll(r, g, b, 'oklab:lab');
     });
