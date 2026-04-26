@@ -21,77 +21,35 @@
       <div class="color-card">
         <label>sRGB</label>
         <div>
-          <div class="red">
-            <label>R</label>
-            <input type="number" id="srgb:r" min="0" max="1" step="0.001" value="0">
-          </div>
-          <div class="green">
-            <label>G</label>
-            <input type="number" id="srgb:g" min="0" max="1" step="0.001" value="0">
-          </div>
-          <div class="blue">
-            <label>B</label>
-            <input type="number" id="srgb:b" min="0" max="1" step="0.001" value="0">
-          </div>
+          <div class="red"><label>R</label><input id="srgb-float:r"></div>
+          <div class="green"><label>G</label><input id="srgb-float:g"></div>
+          <div class="blue"><label>B</label><input id="srgb-float:b"></div>
         </div>
         <div>
-          <div class="red">
-            <label>8-bit</label>
-            <input type="number" id="srgb.uint:r" min="0" max="255" value="0">
-          </div>
-          <div class="green">
-            <label>8-bit</label>
-            <input type="number" id="srgb.uint:g" min="0" max="255" value="0">
-          </div>
-          <div class="blue">
-            <label>8-bit</label>
-            <input type="number" id="srgb.uint:b" min="0" max="255" value="0">
-          </div>
+          <div class="red"><label>8-bit</label><input id="srgb-uint:r"></div>
+          <div class="green"><label>8-bit</label><input id="srgb-uint:g"></div>
+          <div class="blue"><label>8-bit</label><input id="srgb-uint:b"></div>
         </div>
         <div>
-          <div>
-            <label>HEX</label>
-            <input type="text" id="srgb.hex" value="N/A" readonly>
-          </div>
+          <div><label>HEX</label><input id="srgb-uint.hex" readonly></div>
         </div>
         <div>
-          <div>
-            <label>CSS</label>
-            <input type="text" id="srgb.rgb" value="N/A" readonly>
-          </div>
+          <div><label>CSS</label><input id="srgb-uint.rgb" readonly></div>
         </div>
         <div>
-          <div>
-            <label>CSS</label>
-            <input type="text" id="srgb.color" value="N/A" readonly>
-          </div>
-        </div>
-        <label>Linear</label>
+          <div><label>CSS</label><input id="srgb-float.color" readonly></div>
+
+        </div><label>Linear</label>
         <div>
-          <div class="red">
-            <label>R</label>
-            <input type="number" id="srgb-linear:r" min="0" max="1" step="0.001" value="0">
-          </div>
-          <div class="green">
-            <label>G</label>
-            <input type="number" id="srgb-linear:g" min="0" max="1" step="0.001" value="0">
-          </div>
-          <div class="blue">
-            <label>B</label>
-            <input type="number" id="srgb-linear:b" min="0" max="1" step="0.001" value="0">
-          </div>
+          <div class="red"><label>R</label><input id="srgb-linear:r"></div>
+          <div class="green"><label>G</label><input id="srgb-linear:g"></div>
+          <div class="blue"><label>B</label><input id="srgb-linear:b"></div>
         </div>
         <div>
-          <div>
-            <label>CSS</label>
-            <input type="text" id="srgb-linear.color" value="N/A" readonly>
-          </div>
+          <div><label>CSS</label><input id="srgb-linear.color" readonly></div>
         </div>
         <div>
-          <div>
-            <label>WGSL</label>
-            <input type="text" id="srgb-linear.wgsl" value="N/A" readonly>
-          </div>
+          <div><label>WGSL</label><input id="srgb-linear.wgsl" readonly></div>
         </div>
       </div>
 
@@ -99,24 +57,12 @@
       <div class="color-card">
         <label>HSL</label>
         <div>
-          <div>
-            <label>H</label>
-            <input type="number" id="hsl:h" min="0" max="1" step="0.0002" value="0">
-          </div>
-          <div>
-            <label>S</label>
-            <input type="number" id="hsl:s" min="0" max="1" step="0.001" value="0">
-          </div>
-          <div>
-            <label>L</label>
-            <input type="number" id="hsl:l" min="0" max="1" step="0.001" value="0">
-          </div>
+          <div><label>H</label><input id="hsl:h"></div>
+          <div><label>S</label><input id="hsl:s"></div>
+          <div><label>L</label><input id="hsl:l"></div>
         </div>
         <div>
-          <div>
-            <label>CSS</label>
-            <input type="text" id="hsl.hsl" value="N/A" readonly>
-          </div>
+          <div><label>CSS</label><input id="hsl.hsl" readonly></div>
         </div>
       </div>
 
@@ -124,18 +70,9 @@
       <div class="color-card">
         <label>HSV</label>
         <div>
-          <div>
-            <label>H</label>
-            <input type="number" id="hsv:h" min="0" max="1" step="0.0002" value="0">
-          </div>
-          <div>
-            <label>S</label>
-            <input type="number" id="hsv:s" min="0" max="1" step="0.001" value="0">
-          </div>
-          <div>
-            <label>V</label>
-            <input type="number" id="hsv:v" min="0" max="1" step="0.001" value="0">
-          </div>
+          <div><label>H</label><input id="hsv:h"></div>
+          <div><label>S</label><input id="hsv:s"></div>
+          <div><label>V</label><input id="hsv:v"></div>
         </div>
       </div>
 
@@ -143,24 +80,12 @@
       <div class="color-card">
         <label>OKLab</label>
         <div>
-          <div>
-            <label>L</label>
-            <input type="number" id="oklab:l" min="0" max="1" step="0.001" value="0">
-          </div>
-          <div>
-            <label>a</label>
-            <input type="number" id="oklab:a" min="-1" max="1" step="0.001" value="0">
-          </div>
-          <div>
-            <label>b</label>
-            <input type="number" id="oklab:b" min="-1" max="1" step="0.001" value="0">
-          </div>
+          <div><label>L</label><input id="oklab:l"></div>
+          <div><label>a</label><input id="oklab:a"></div>
+          <div><label>b</label><input id="oklab:b"></div>
         </div>
         <div>
-          <div>
-            <label>CSS</label>
-            <input type="text" id="oklab.oklab" value="N/A" readonly>
-          </div>
+          <div><label>CSS</label><input id="oklab.oklab" readonly></div>
         </div>
       </div>
 
@@ -168,24 +93,12 @@
       <div class="color-card">
         <label>OKLCH</label>
         <div>
-          <div>
-            <label>L</label>
-            <input type="number" id="oklch:l" min="0" max="1" step="0.001" value="0">
-          </div>
-          <div>
-            <label>C</label>
-            <input type="number" id="oklch:c" min="0" max="1" step="0.001" value="0">
-          </div>
-          <div>
-            <label>H</label>
-            <input type="number" id="oklch:h" min="0" max="1" step="0.0002" value="0">
-          </div>
+          <div><label>L</label><input id="oklch:l"></div>
+          <div><label>C</label><input id="oklch:c"></div>
+          <div><label>H</label><input id="oklch:h"></div>
         </div>
         <div>
-          <div>
-            <label>CSS</label>
-            <input type="text" id="oklch.oklch" value="N/A" readonly>
-          </div>
+          <div><label>CSS</label><input id="oklch.oklch" readonly></div>
         </div>
       </div>
 
@@ -193,18 +106,9 @@
       <div class="color-card">
         <label>LMS</label>
         <div>
-          <div>
-            <label>L</label>
-            <input type="number" id="lms:l" min="0" max="1" step="0.001" value="0">
-          </div>
-          <div>
-            <label>M</label>
-            <input type="number" id="lms:m" min="0" max="1" step="0.001" value="0">
-          </div>
-          <div>
-            <label>S</label>
-            <input type="number" id="lms:s" min="0" max="1" step="0.001" value="0">
-          </div>
+          <div><label>L</label><input id="lms:l"></div>
+          <div><label>M</label><input id="lms:m"></div>
+          <div><label>S</label><input id="lms:s"></div>
         </div>
       </div>
     </div>

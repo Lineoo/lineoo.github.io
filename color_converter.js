@@ -146,8 +146,8 @@ function hexToRgb(hex) {
     return [((num >> 16) & 255) / 255, ((num >> 8) & 255) / 255, (num & 255) / 255];
 }
 
-function rgbToHex(r, g, b) {
-    return '#' + [r, g, b].map(x => (Math.round(x * 255) & 255).toString(16).padStart(2, '0')).join('');
+function srgbFloatToUintClamped(r, g, b) {
+    return [r, g, b].map(x => (Math.min(Math.max(Math.round(x * 255), 0), 255)));
 }
 
 // ===== UI Logic =====// 
@@ -174,15 +174,15 @@ const initSrgb = [0.24, 0.53, 0.95];
 const valPrcs = 3;
 const dgrPrcs = 4;
 const els = {
-    srgbR: document.getElementById('srgb:r'),
-    srgbG: document.getElementById('srgb:g'),
-    srgbB: document.getElementById('srgb:b'),
-    srgbUintR: document.getElementById('srgb.uint:r'),
-    srgbUintG: document.getElementById('srgb.uint:g'),
-    srgbUintB: document.getElementById('srgb.uint:b'),
-    srgbHex: document.getElementById('srgb.hex'),
-    srgbRgb: document.getElementById('srgb.rgb'),
-    srgbColor: document.getElementById('srgb.color'),
+    srgbR: document.getElementById('srgb-float:r'),
+    srgbG: document.getElementById('srgb-float:g'),
+    srgbB: document.getElementById('srgb-float:b'),
+    srgbUintR: document.getElementById('srgb-uint:r'),
+    srgbUintG: document.getElementById('srgb-uint:g'),
+    srgbUintB: document.getElementById('srgb-uint:b'),
+    srgbHex: document.getElementById('srgb-uint.hex'),
+    srgbRgb: document.getElementById('srgb-uint.rgb'),
+    srgbColor: document.getElementById('srgb-float.color'),
     srgbLinearR: document.getElementById('srgb-linear:r'),
     srgbLinearG: document.getElementById('srgb-linear:g'),
     srgbLinearB: document.getElementById('srgb-linear:b'),
@@ -212,7 +212,7 @@ function updateAll(r, g, b, source) {
     if (updating) return;
     updating = true;
 
-    const hex = rgbToHex(r, g, b);
+    const [uintR, uintG, uintB] = srgbFloatToUintClamped(r, g, b);
     const [hslH, hslS, hslL] = srgbToHsl(r, g, b);
     const [hsvH, hsvS, hsvV] = srgbToHsv(r, g, b);
     const [linR, linG, linB] = srgbSensitiveToLinear(r, g, b);
@@ -220,27 +220,35 @@ function updateAll(r, g, b, source) {
     const [labL, labA, labB] = lmsToOklab(lmsL, lmsM, lmsS);
     const [lchL, lchC, lchH] = oklabToOklch(labL, labA, labB);
 
-    if (source !== 'srgb:rgb') {
+    if (source !== 'srgb-float:rgb') {
         els.srgbR.value = r.toFixed(valPrcs);
         els.srgbG.value = g.toFixed(valPrcs);
         els.srgbB.value = b.toFixed(valPrcs);
     }
 
-    if (source !== 'srgb.uint:rgb') {
+    color_overdrive(r > 1 || r < 0, els.srgbUintR);
+    color_overdrive(g > 1 || g < 0, els.srgbUintG);
+    color_overdrive(b > 1 || b < 0, els.srgbUintB);
+    if (source !== 'srgb-uint:rgb') {
         els.srgbUintR.value = Math.round(r * 255);
         els.srgbUintG.value = Math.round(g * 255);
         els.srgbUintB.value = Math.round(b * 255);
     }
 
-    if (source !== 'srgb.hex') {
-        els.srgbHex.value = hex;
+    color_clip(r > 1 || r < 0 || g > 1 || g < 0 || b > 1 || b < 0, els.srgbHex);
+    if (source !== 'srgb-uint.hex') {
+        els.srgbHex.value = `#\
+${uintR.toString(16).padStart(2, '0')}\
+${uintG.toString(16).padStart(2, '0')}\
+${uintB.toString(16).padStart(2, '0')}`;
     }
 
-    if (source !== 'srgb.rgb') {
-        els.srgbRgb.value = `rgb(${r.toFixed(valPrcs)} ${g.toFixed(valPrcs)} ${b.toFixed(valPrcs)})`;
+    color_clip(r > 1 || r < 0 || g > 1 || g < 0 || b > 1 || b < 0, els.srgbRgb);
+    if (source !== 'srgb-uint.rgb') {
+        els.srgbRgb.value = `rgb(${uintR} ${uintG} ${uintB})`;
     }
 
-    if (source !== 'srgb.color') {
+    if (source !== 'srgb-float.color') {
         els.srgbColor.value = `color(srgb ${r.toFixed(valPrcs)} ${g.toFixed(valPrcs)} ${b.toFixed(valPrcs)})`;
     }
 
@@ -303,13 +311,51 @@ function updateAll(r, g, b, source) {
     updating = false;
 }
 
+function color_clip(enable, elem) {
+    if (!elem.color_clip && enable) {
+        color_alert_buttons(elem);
+        let button = document.createElement("button");
+        button.className = "color-alert clip";
+        button.title = "颜色被裁切（非原始色彩）";
+
+        elem.color_clip = button;
+        elem.alert_buttons.appendChild(button);
+    } else if (elem.color_clip && !enable) {
+        elem.alert_buttons.removeChild(elem.color_clip);
+        elem.color_clip = undefined;
+    }
+}
+
+function color_overdrive(enable, elem) {
+    if (!elem.color_overdrive && enable) {
+        color_alert_buttons(elem);
+        let button = document.createElement("button");
+        button.className = "color-alert overdrive";
+        button.title = "颜色未定义（超出色域）";
+
+        elem.color_overdrive = button;
+        elem.alert_buttons.appendChild(button);
+    } else if (elem.color_overdrive && !enable) {
+        elem.alert_buttons.removeChild(elem.color_overdrive);
+        elem.color_overdrive = undefined;
+    }
+}
+
+function color_alert_buttons(elem) {
+    if (!elem.alert_buttons) {
+        let div = document.createElement("div");
+        elem.alert_buttons = div;
+        elem.parentElement.appendChild(div);
+    }
+}
+
 // Event Listeners
 ['srgbR', 'srgbG', 'srgbB'].forEach(id => {
     els[id].addEventListener('input', () => {
         const r = parseFloat(els.srgbR.value) || 0;
         const g = parseFloat(els.srgbG.value) || 0;
         const b = parseFloat(els.srgbB.value) || 0;
-        updateAll(r, g, b, 'srgb:rgb');
+        updateAll(r, g, b, 'srgb-float:rgb');
     });
 });
 
@@ -318,7 +364,7 @@ function updateAll(r, g, b, source) {
         const r = Math.round(parseFloat(els.srgbUintR.value)) || 0;
         const g = Math.round(parseFloat(els.srgbUintG.value)) || 0;
         const b = Math.round(parseFloat(els.srgbUintB.value)) || 0;
-        updateAll(r / 255, g / 255, b / 255, 'srgb.uint:rgb');
+        updateAll(r / 255, g / 255, b / 255, 'srgb-uint:rgb');
     });
 });
 
