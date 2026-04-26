@@ -192,6 +192,9 @@ const els = {
     hslS: document.getElementById('hsl:s'),
     hslL: document.getElementById('hsl:l'),
     hslHsl: document.getElementById('hsl.hsl'),
+    hsvH: document.getElementById('hsv:h'),
+    hsvS: document.getElementById('hsv:s'),
+    hsvV: document.getElementById('hsv:v'),
     oklchL: document.getElementById('oklch:l'),
     oklchC: document.getElementById('oklch:c'),
     oklchH: document.getElementById('oklch:h'),
@@ -200,6 +203,9 @@ const els = {
     oklabA: document.getElementById('oklab:a'),
     oklabB: document.getElementById('oklab:b'),
     oklabOklab: document.getElementById('oklab.oklab'),
+    lmsL: document.getElementById('lms:l'),
+    lmsM: document.getElementById('lms:m'),
+    lmsS: document.getElementById('lms:s'),
 };
 
 function updateAll(r, g, b, source) {
@@ -207,7 +213,8 @@ function updateAll(r, g, b, source) {
     updating = true;
 
     const hex = rgbToHex(r, g, b);
-    const [h, s, l] = srgbToHsl(r, g, b);
+    const [hslH, hslS, hslL] = srgbToHsl(r, g, b);
+    const [hsvH, hsvS, hsvV] = srgbToHsv(r, g, b);
     const [linR, linG, linB] = srgbSensitiveToLinear(r, g, b);
     const [lmsL, lmsM, lmsS] = srgbLinearToLms(linR, linG, linB);
     const [labL, labA, labB] = lmsToOklab(lmsL, lmsM, lmsS);
@@ -252,13 +259,19 @@ function updateAll(r, g, b, source) {
     }
 
     if (source !== 'hsl:hsl') {
-        els.hslH.value = h.toFixed(dgrPrcs);
-        els.hslS.value = s.toFixed(valPrcs);
-        els.hslL.value = l.toFixed(valPrcs);
+        els.hslH.value = hslH.toFixed(dgrPrcs);
+        els.hslS.value = hslS.toFixed(valPrcs);
+        els.hslL.value = hslL.toFixed(valPrcs);
     }
 
     if (source !== 'hsl.hsl') {
-        els.hslHsl.value = `hsl(${h.toFixed(dgrPrcs)}, ${s.toFixed(valPrcs)}, ${l.toFixed(valPrcs)})`;
+        els.hslHsl.value = `hsl(${hslH.toFixed(dgrPrcs)}, ${hslS.toFixed(valPrcs)}, ${hslL.toFixed(valPrcs)})`;
+    }
+
+    if (source !== 'hsv:hsv') {
+        els.hsvH.value = hsvH.toFixed(dgrPrcs);
+        els.hsvS.value = hsvS.toFixed(valPrcs);
+        els.hsvV.value = hsvV.toFixed(valPrcs);
     }
 
     if (source !== 'oklch:lch') {
@@ -279,6 +292,12 @@ function updateAll(r, g, b, source) {
 
     if (source !== 'oklab.oklab') {
         els.oklabOklab.value = `oklab(${labL.toFixed(valPrcs)} ${labA.toFixed(valPrcs)} ${labB.toFixed(valPrcs)})`;
+    }
+
+    if (source !== 'lms:lms') {
+        els.lmsL.value = lmsL.toFixed(valPrcs);
+        els.lmsM.value = lmsM.toFixed(valPrcs);
+        els.lmsS.value = lmsS.toFixed(valPrcs);
     }
 
     updating = false;
@@ -305,12 +324,10 @@ function updateAll(r, g, b, source) {
 
 ['srgbLinearR', 'srgbLinearG', 'srgbLinearB'].forEach(id => {
     els[id].addEventListener('input', () => {
-        const lr = parseFloat(els.srgbLinearR.value) || 0;
-        const lg = parseFloat(els.srgbLinearG.value) || 0;
-        const lb = parseFloat(els.srgbLinearB.value) || 0;
-        const r = srgbLinearToSensitive(lr);
-        const g = srgbLinearToSensitive(lg);
-        const b = srgbLinearToSensitive(lb);
+        const linR = parseFloat(els.srgbLinearR.value) || 0;
+        const linG = parseFloat(els.srgbLinearG.value) || 0;
+        const linB = parseFloat(els.srgbLinearB.value) || 0;
+        const [r, g, b] = srgbLinearToSensitive(linR, linG, linB);
         updateAll(r, g, b, 'srgb-linear:rgb');
     });
 });
@@ -322,6 +339,16 @@ function updateAll(r, g, b, source) {
         const l = parseFloat(els.hslL.value) || 0;
         const [r, g, b] = hslToSrgb(h, s, l);
         updateAll(r, g, b, 'hsl:hsl');
+    });
+});
+
+['hsvH', 'hsvS', 'hsvV'].forEach(id => {
+    els[id].addEventListener('input', () => {
+        const h = parseFloat(els.hsvH.value) || 0;
+        const s = parseFloat(els.hsvS.value) || 0;
+        const v = parseFloat(els.hsvV.value) || 0;
+        const [r, g, b] = hsvToSrgb(h, s, v);
+        updateAll(r, g, b, 'hsv:hsv');
     });
 });
 
@@ -349,6 +376,18 @@ function updateAll(r, g, b, source) {
         const [linR, linG, linB] = lmsToSrgbLinear(lmsL, lmsM, lmsS);
         const [r, g, b] = srgbLinearToSensitive(linR, linG, linB);
         updateAll(r, g, b, 'oklab:lab');
+    });
+});
+
+['lmsL', 'lmsM', 'lmsS'].forEach(id => {
+    els[id].addEventListener('input', () => {
+        const lmsL = parseFloat(els.lmsL.value) || 0;
+        const lmsM = parseFloat(els.lmsM.value) || 0;
+        const lmsS = parseFloat(els.lmsS.value) || 0;
+
+        const [linR, linG, linB] = lmsToSrgbLinear(lmsL, lmsM, lmsS);
+        const [r, g, b] = srgbLinearToSensitive(linR, linG, linB);
+        updateAll(r, g, b, 'lms:lms');
     });
 });
 
