@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>极简浏览器 - 轻量级网页浏览工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none; /* 避免拖动时误选，不影响输入框 */
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #1e1f2c;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 整体浏览器容器 */
+        .browser-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            background: #f5f5f7;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+        }
+
+        /* 顶部工具栏 - 现代毛玻璃效果 */
+        .toolbar {
+            background: rgba(30, 31, 44, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 8px 12px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        /* 导航按钮组 */
+        .nav-buttons {
+            display: flex;
+            gap: 6px;
+            background: rgba(0,0,0,0.2);
+            padding: 4px 8px;
+            border-radius: 32px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: none;
+            color: #eef2ff;
+            font-size: 20px;
+            cursor: pointer;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255,255,255,0.15);
+            transform: scale(1.02);
+        }
+
+        .nav-btn:active {
+            background: rgba(255,255,255,0.25);
+            transform: scale(0.96);
+        }
+
+        .nav-btn.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* 地址栏区域 */
+        .url-bar-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            background: #2d2f3e;
+            border-radius: 44px;
+            padding: 4px 12px;
+            border: 1px solid #4b4e6b;
+            transition: all 0.2s;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .url-bar-wrapper:focus-within {
+            border-color: #6c8cff;
+            background: #252736;
+            box-shadow: 0 0 0 2px rgba(108,140,255,0.3);
+        }
+
+        .url-icon {
+            color: #9ca3d0;
+            font-size: 18px;
+            margin-right: 8px;
+        }
+
+        #urlInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #f0f3ff;
+            font-size: 15px;
+            padding: 10px 0;
+            outline: none;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            letter-spacing: 0.3px;
+        }
+
+        #urlInput::placeholder {
+            color: #6b6f96;
+            font-weight: 400;
+        }
+
+        .go-btn {
+            background: #6c8cff;
+            border: none;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            padding: 6px 16px;
+            border-radius: 32px;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-left: 6px;
+            font-family: inherit;
+        }
+
+        .go-btn:hover {
+            background: #5a7ae0;
+            transform: scale(0.97);
+        }
+
+        /* 辅助操作区 */
+        .extras {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .badge {
+            background: #35384b;
+            border-radius: 24px;
+            padding: 5px 12px;
+            font-size: 12px;
+            color: #bfc9ff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .badge i {
+            font-style: normal;
+            font-weight: 500;
+        }
+
+        /* 书签栏 / 快速访问 */
+        .bookmark-bar {
+            background: #2a2c3a;
+            padding: 6px 16px;
+            display: flex;
+            gap: 18px;
+            overflow-x: auto;
+            scrollbar-width: thin;
+            border-bottom: 1px solid #3c3f54;
+            font-size: 13px;
+        }
+
+        .bookmark-item {
+            color: #cdd6ff;
+            text-decoration: none;
+            padding: 4px 8px;
+            border-radius: 20px;
+            transition: 0.2s;
+            cursor: pointer;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+
+        .bookmark-item:hover {
+            background: #3d405b;
+            color: white;
+        }
+
+        /* iframe 内容区域 */
+        .viewer {
+            flex: 1;
+            position: relative;
+            background: #ffffff;
+            transition: all 0.2s;
+        }
+
+        #webFrame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        }
+
+        /* 加载指示器 */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(245,245,247,0.85);
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 20;
+            visibility: hidden;
+            opacity: 0;
+            transition: 0.2s;
+            font-family: monospace;
+        }
+
+        .loading-overlay.active {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .spinner {
+            width: 44px;
+            height: 44px;
+            border: 4px solid #e0e2f0;
+            border-top: 4px solid #6c8cff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px 18px;
+            border-radius: 20px;
+            font-size: 13px;
+            text-align: center;
+            backdrop-filter: blur(8px);
+            background: rgba(255,235,238,0.95);
+            border-left: 4px solid #d32f2f;
+            display: none;
+            z-index: 25;
+            font-weight: 500;
+            pointer-events: none;
+        }
+
+        .error-message.show {
+            display: block;
+            animation: fadeInUp 0.2s ease;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 新窗口打开辅助按钮 */
+        .external-tip {
+            background: #2d2f3e;
+            color: #ccd6ff;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 32px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .external-tip:hover {
+            background: #4c4f6e;
+            color: white;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 680px) {
+            .toolbar {
+                padding: 6px 10px;
+                gap: 5px;
+            }
+            .nav-btn {
+                width: 36px;
+                height: 36px;
+                font-size: 18px;
+            }
+            .badge span {
+                display: none;
+            }
+            .bookmark-bar {
+                gap: 8px;
+                padding: 4px 12px;
+            }
+            .bookmark-item {
+                font-size: 11px;
+            }
+            .go-btn {
+                padding: 5px 12px;
+            }
+        }
+    </style>
+    <!-- 字体图标库 (纯文本模拟图标) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+<div class="browser-container">
+    <!-- 主工具栏 -->
+    <div class="toolbar">
+        <div class="nav-buttons">
+            <button class="nav-btn" id="backBtn" title="后退"><i class="fas fa-arrow-left"></i></button>
+            <button class="nav-btn" id="forwardBtn" title="前进"><i class="fas fa-arrow-right"></i></button>
+            <button class="nav-btn" id="refreshBtn" title="刷新"><i class="fas fa-sync-alt"></i></button>
+            <button class="nav-btn" id="homeBtn" title="主页"><i class="fas fa-home"></i></button>
+        </div>
+
+        <div class="url-bar-wrapper">
+            <i class="fas fa-globe url-icon"></i>
+            <input type="text" id="urlInput" placeholder="输入网址或搜索内容..." autocomplete="off" spellcheck="false">
+            <button class="go-btn" id="goBtn">前往</button>
+        </div>
+
+        <div class="extras">
+            <div class="badge">
+                <i class="fas fa-shield-alt"></i>
+                <span>安全浏览</span>
+            </div>
+            <div class="external-tip" id="openNewWindowBtn">
+                <i class="fas fa-external-link-alt"></i>
+                <span>新窗口</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速书签栏 (常用站点，便于演示) -->
+    <div class="bookmark-bar">
+        <a class="bookmark-item" data-url="https://www.example.com"><i class="fab fa-fort-awesome"></i> Example</a>
+        <a class="bookmark-item" data-url="https://www.wikipedia.org"><i class="fab fa-wikipedia-w"></i> Wikipedia</a>
+        <a class="bookmark-item" data-url="https://github.com"><i class="fab fa-github"></i> GitHub</a>
+        <a class="bookmark-item" data-url="https://news.ycombinator.com"><i class="fas fa-newspaper"></i> Hacker News</a>
+        <a class="bookmark-item" data-url="https://www.bing.com"><i class="fab fa-microsoft"></i> Bing</a>
+        <a class="bookmark-item" data-url="https://duckduckgo.com"><i class="fas fa-duck"></i> DuckDuckGo</a>
+    </div>
+
+    <!-- 网页显示区 -->
+    <div class="viewer">
+        <iframe id="webFrame" title="浏览器内容区" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals allow-top-navigation-by-user-activation allow-downloads"></iframe>
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="spinner"></div>
+            <div style="color:#2c3e66;">加载中...</div>
+        </div>
+        <div class="error-message" id="errorMessage">
+            <i class="fas fa-lock"></i> 无法嵌入该网站 (X-Frame-Options限制) 或网络错误。<br>
+            <strong>点击「新窗口」按钮可在系统浏览器中打开</strong>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ---------- 简易浏览器核心 ----------
+    // 历史管理 (基于手动导航)
+    let historyStack = [];     // 存储访问过的URL
+    let currentIndex = -1;     // 当前历史位置
+    let currentIframeUrl = "";  // 当前iframe加载的url (用于同步状态)
+
+    // DOM 元素
+    const backBtn = document.getElementById('backBtn');
+    const forwardBtn = document.getElementById('forwardBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const homeBtn = document.getElementById('homeBtn');
+    const goBtn = document.getElementById('goBtn');
+    const urlInput = document.getElementById('urlInput');
+    const webFrame = document.getElementById('webFrame');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const errorMsgDiv = document.getElementById('errorMessage');
+    const openNewWindowBtn = document.getElementById('openNewWindowBtn');
+
+    // 主页地址 (自定义快速起始页)
+    const HOME_URL = "https://start.duckduckgo.com/";
+    // 默认起始页 (about:blank 风格的优雅起始)
+    const DEFAULT_START = "https://www.example.com";
+
+    // 辅助函数: 显示/隐藏加载动画
+    function showLoading(show) {
+        if (show) {
+            loadingOverlay.classList.add('active');
+            errorMsgDiv.classList.remove('show');
+        } else {
+            loadingOverlay.classList.remove('active');
+        }
+    }
+
+    // 显示错误提示(可嵌入失败, 跨域限制等)
+    function showError(visible, customMsg = null) {
+        if (visible) {
+            if (customMsg) {
+                errorMsgDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${customMsg}<br><strong>💡 可使用「新窗口」按钮在原生浏览器打开</strong>`;
+            } else {
+                errorMsgDiv.innerHTML = `<i class="fas fa-lock"></i> 该网站禁止被嵌入 (X-Frame-Options限制) 或连接失败。<br><strong>点击右侧「新窗口」以在系统浏览器中查看</strong>`;
+            }
+            errorMsgDiv.classList.add('show');
+            // 5秒后自动淡出，但保留新窗口入口可再次触发
+            setTimeout(() => {
+                if (errorMsgDiv.classList.contains('show')) {
+                    // 不立刻强制隐藏，让用户明白，但5秒后淡出，用户鼠标悬浮可再显示? 简单处理
+                    if(!errorMsgDiv.matches(':hover')) errorMsgDiv.classList.remove('show');
+                }
+            }, 6000);
+        } else {
+            errorMsgDiv.classList.remove('show');
+        }
+    }
+
+    // 更新前进后退按钮状态
+    function updateNavButtons() {
+        if (currentIndex <= 0) {
+            backBtn.classList.add('disabled');
+        } else {
+            backBtn.classList.remove('disabled');
+        }
+        if (currentIndex >= historyStack.length - 1 || historyStack.length === 0) {
+            forwardBtn.classList.add('disabled');
+        } else {
+            forwardBtn.classList.remove('disabled');
+        }
+    }
+
+    // 将URL标准化 (添加协议, 处理搜索)
+    function normalizeUrl(input) {
+        let trimmed = input.trim();
+        if (trimmed === "") return HOME_URL;
+
+        // 搜索关键词检测: 如果不包含点号且不包含常见协议，也不是localhost，视为搜索词
+        const hasProtocol = /^(https?:\/\/|ftp:\/\/|file:\/\/)/i.test(trimmed);
+        const isLikelyDomain = /^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/.*)?$/.test(trimmed) || /^localhost(:\d+)?$/.test(trimmed);
+        
+        if (!hasProtocol && !isLikelyDomain) {
+            // 当作搜索引擎查询 (Google)
+            return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
+        }
+        
+        if (!hasProtocol && isLikelyDomain) {
+            return `https://${trimmed}`;
+        }
+        return trimmed;
+    }
+
+    // 核心加载函数: 加载指定URL到iframe中
+    function loadUrl(rawUrl, addToHistory = true, updateInput = true) {
+        let targetUrl = normalizeUrl(rawUrl);
+        // 防止无效
+        if (!targetUrl.startsWith('http') && !targetUrl.startsWith('https') && !targetUrl.startsWith('about:')) {
+            targetUrl = 'https://' + targetUrl;
+        }
+        
+        // 相同URL且是相同origin避免重复load闪烁，但为了刷新也会调用
+        if (currentIframeUrl === targetUrl && addToHistory === false && webFrame.src === targetUrl) {
+            // 强制刷新时还是触发重新加载
+            webFrame.src = targetUrl;
+            return;
+        }
+
+        // 显示加载动画
+        showLoading(true);
+        // 隐藏之前的错误提示
+        showError(false);
+        
+        // 设置iframe src
+        webFrame.src = targetUrl;
+        currentIframeUrl = targetUrl;
+        
+        if (updateInput) {
+            urlInput.value = targetUrl;
+        }
+        
+        // 历史记录管理 (仅在用户主动导航或者点击书签、go时记录)
+        if (addToHistory) {
+            // 如果当前不是历史末尾，则截断后面的历史
+            if (currentIndex < historyStack.length - 1) {
+                historyStack = historyStack.slice(0, currentIndex + 1);
+            }
+            historyStack.push(targetUrl);
+            currentIndex = historyStack.length - 1;
+            updateNavButtons();
+        }
+        
+        // 设置一个超时隐藏加载(如果iframe onload未触发)
+        const loadTimeout = setTimeout(() => {
+            if (loadingOverlay.classList.contains('active')) {
+                showLoading(false);
+                // 如果长时间加载还没完成，且未触发错误，也许显示网络提示
+                if (!errorMsgDiv.classList.contains('show')) {
+                    showError(true, "页面加载缓慢或网络问题，请检查链接或尝试「新窗口」打开");
+                }
+            }
+        }, 12000);
+        
+        // 监听iframe加载完成
+        const onLoadHandler = function() {
+            clearTimeout(loadTimeout);
+            showLoading(false);
+            // 尝试读取iframe当前真实url (同源才能读取，若不同源则保持当前地址栏内容)
+            try {
+                const iframeWindow = webFrame.contentWindow;
+                if (iframeWindow && iframeWindow.location) {
+                    const realUrl = iframeWindow.location.href;
+                    if (realUrl && realUrl !== "about:blank") {
+                        // 如果真实URL与预期不一致，同步地址栏（同源站点可用，跨域会报错但catch）
+                        if (realUrl !== currentIframeUrl) {
+                            currentIframeUrl = realUrl;
+                            urlInput.value = realUrl;
+                            // 跨域情况不同步但至少不会显示错误，外部链接点击后地址栏不同步属于已知限制,
+                            // 优雅提醒: 添加一次性tooltip?
+                        }
+                    }
+                }
+            } catch (e) {
+                // 跨域资源无法读取location，不做处理，地址栏保持原样。显示小提示（悬浮）
+                // 这不是致命错误，大部分网站跨域很正常，可以展示小贴士但不持续干扰
+                if (!window._crossTipShown) {
+                    // 控制台安静，只显示一次短时tip
+                    const subtleTip = document.createElement('div');
+                    subtleTip.innerText = '⚠️ 由于跨域策略，地址栏可能不会自动同步iframe内链接，请手动输入URL导航';
+                    subtleTip.style.position = 'fixed';
+                    subtleTip.bottom = '50px';
+                    subtleTip.left = '20px';
+                    subtleTip.background = '#2c2e42';
+                    subtleTip.color = '#ffec99';
+                    subtleTip.padding = '6px 14px';
+                    subtleTip.borderRadius = '24px';
+                    subtleTip.fontSize = '12px';
+                    subtleTip.zIndex = 999;
+                    subtleTip.style.opacity = '0.9';
+                    document.body.appendChild(subtleTip);
+                    setTimeout(() => subtleTip.remove(), 4000);
+                    window._crossTipShown = true;
+                }
+            }
+            webFrame.removeEventListener('load', onLoadHandler);
+        };
+        
+        // 移除旧的监听避免重复
+        webFrame.removeEventListener('load', onLoadHandler);
+        webFrame.addEventListener('load', onLoadHandler);
+        
+        // 错误处理：如果iframe加载过程中因为X-Frame-Options等报错，无法触发load? 可用error事件
+        webFrame.onerror = function() {
+            clearTimeout(loadTimeout);
+            showLoading(false);
+            showError(true);
+        };
+        
+        // 使用try catch在设置src后如果策略报错无法捕获, 但error事件可能不够, 增加检测机制
+        setTimeout(() => {
+            // 检查iframe内容是否可访问以判断是否被阻止 (仅安全检测)
+            try {
+                if (webFrame.contentDocument && webFrame.contentDocument.location.href === "about:blank" && targetUrl !== "about:blank") {
+                    // 可能被阻止
+                    if (loadingOverlay.classList.contains('active')) {
+                        showLoading(false);
+                        showError(true);
+                    }
+                }
+            } catch (err) {
+                // 跨域也会异常，但不一定代表错误，只有特定情况才提醒
+                if (targetUrl.includes('google') || targetUrl.includes('facebook') || targetUrl.includes('youtube')) {
+                    if (loadingOverlay.classList.contains('active')) {
+                        showLoading(false);
+                        showError(true, "主流网站 (如Google, Youtube) 禁止被嵌入框架。请使用「新窗口」按钮打开浏览器查看完整网页。");
+                    }
+                }
+            }
+        }, 2000);
+    }
+
+    // 后退功能
+    function goBack() {
+        if (currentIndex > 0) {
+            currentIndex--;
+            const prevUrl = historyStack[currentIndex];
+            loadUrl(prevUrl, false, true);
+            urlInput.value = prevUrl;
+            updateNavButtons();
+        }
+    }
+    
+    // 前进
+    function goForward() {
+        if (currentIndex < historyStack.length - 1) {
+            currentIndex++;
+            const nextUrl = historyStack[currentIndex];
+            loadUrl(nextUrl, false, true);
+            urlInput.value = nextUrl;
+            updateNavButtons();
+        }
+    }
+    
+    // 刷新当前页面
+    function refreshPage() {
+        if (webFrame.src && webFrame.src !== "about:blank") {
+            const currentSrc = webFrame.src;
+            // 重新加载
+            loadUrl(currentSrc, false, false);
+        } else if (currentIframeUrl) {
+            loadUrl(currentIframeUrl, false, true);
+        } else {
+            loadUrl(HOME_URL, false, true);
+        }
+    }
+    
+    // 主页
+    function goHome() {
+        loadUrl(HOME_URL, true, true);
+    }
+    
+    // 从地址栏或书签导航
+    function navigateFromInput() {
+        let inputVal = urlInput.value;
+        if (inputVal === "") return;
+        loadUrl(inputVal, true, true);
+    }
+    
+    // 新窗口打开当前页面 (绕过iframe限制)
+    function openInSystemBrowser() {
+        let currentUrl = currentIframeUrl;
+        if (!currentUrl || currentUrl === "about:blank") {
+            currentUrl = urlInput.value.trim();
+            if (!currentUrl) currentUrl = HOME_URL;
+        }
+        // 标准化后再打开
+        const finalUrl = normalizeUrl(currentUrl);
+        window.open(finalUrl, '_blank', 'noopener,noreferrer');
+        // 给予用户提示
+        showError(false); // 临时清除错误提示
+        const info = document.createElement('div');
+        info.innerText = '✅ 已在系统新标签页打开: ' + finalUrl;
+        info.style.position = 'fixed';
+        info.style.bottom = '20px';
+        info.style.right = '20px';
+        info.style.background = '#1e2a3a';
+        info.style.color = '#b9f6ca';
+        info.style.padding = '8px 16px';
+        info.style.borderRadius = '28px';
+        info.style.fontSize = '13px';
+        info.style.zIndex = 999;
+        info.style.boxShadow = '0 2px 12px rgba(0,0,0,0.2)';
+        document.body.appendChild(info);
+        setTimeout(() => info.remove(), 2500);
+    }
+    
+    // 书签点击处理
+    function initBookmarks() {
+        const bookmarks = document.querySelectorAll('.bookmark-item');
+        bookmarks.forEach(bookmark => {
+            bookmark.addEventListener('click', (e) => {
+                e.preventDefault();
+                let targetUrl = bookmark.getAttribute('data-url');
+                if (targetUrl) {
+                    loadUrl(targetUrl, true, true);
+                }
+            });
+        });
+    }
+    
+    // 监听iframe内部链接引起的变化? 跨域无法直接捕获，但用load事件修正部分同源情况
+    // 额外增加: 当用户点击某些内部链接时, 如果同源会利用load事件同步地址栏, 跨域保持友好提醒
+    // 另外在新窗口按钮已经提供完美解决方案
+    
+    // 初始化历史: 设定起始页面
+    function initBrowser() {
+        // 设置起始主页example
+        const startUrl = DEFAULT_START;
+        historyStack = [];
+        currentIndex = -1;
+        loadUrl(startUrl, true, true);
+        updateNavButtons();
+        initBookmarks();
+    }
+    
+    // 监听地址栏回车
+    urlInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            navigateFromInput();
+        }
+    });
+    
+    // 绑定按钮
+    backBtn.addEventListener('click', goBack);
+    forwardBtn.addEventListener('click', goForward);
+    refreshBtn.addEventListener('click', refreshPage);
+    homeBtn.addEventListener('click', goHome);
+    goBtn.addEventListener('click', navigateFromInput);
+    openNewWindowBtn.addEventListener('click', openInSystemBrowser);
+    
+    // 额外: 如果是用户通过右键刷新帧内页面 我们不做额外同步，但是支持
+    // 错误重试: 点击错误提示框可关闭?
+    errorMsgDiv.addEventListener('click', () => {
+        errorMsgDiv.classList.remove('show');
+    });
+    
+    // 优雅启动
+    initBrowser();
+    
+    // 检测iframe加载失败再次重试机制: 对于拒绝嵌入的网页显示明显提示
+    // 在某些iframe被block时加载超时展示错误, 监听securitypolicyviolation? 无需太复杂
+    window.addEventListener('error', (msg) => {
+        if (msg.message && msg.message.includes('blocked by X-Frame-Options')) {
+            showLoading(false);
+            showError(true);
+        }
+    }, true);
+    
+    // 当焦点在地址栏时显示完整网址
+    urlInput.addEventListener('focus', (e) => {
+        e.target.select();
+    });
+    
+    // 简单的防抖更新标题前缀
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && webFrame.src) {
+            // 可选: 刷新状态轻提醒
+        }
+    });
+    
+    // 友好的控制台输出
+    console.log("简易浏览器已启动 | 由于跨域限制，某些网站无法嵌入iframe，可用「新窗口」按钮完整浏览");
+</script>
+</body>
+</html>
