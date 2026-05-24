@@ -422,3 +422,15 @@ function color_alert_buttons(elem) {
 });
 
 updateAll(initSrgb[0], initSrgb[1], initSrgb[2], 'init');
+
+document.addEventListener('click', function (e) {
+    const toggle = e.target.closest('.details-toggle');
+    if (!toggle) return;
+
+    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    const descId = toggle.getAttribute('aria-controls');
+    const description = document.getElementById(descId);
+
+    toggle.setAttribute('aria-expanded', !expanded);
+    description.classList.toggle('collapsed', expanded);
+});

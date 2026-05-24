@@ -7,6 +7,7 @@ body {
     flex-flow: column;
     background: oklab(100% 0 0);
     color: oklab(0% 0 0);
+    transition: color 0.3s;
 }
 
 input {
@@ -41,7 +42,7 @@ input {
     container-name: cards-column;
 }
 
-.color-card {
+.card {
     display: flex;
     flex-flow: column;
     padding: 10px;
@@ -56,28 +57,19 @@ input {
 }
 
 @container cards-column (width > 1000px) {
-    .color-card {
+    .card {
         width: calc(50% - 10px);
     }
 }
 
 @container cards-column (width > 2000px) {
-    .color-card {
+    .card {
         width: calc(33% - 10px);
     }
 }
 
-.color-card:hover {
+.card:hover {
     box-shadow: 0 4px 20px oklab(0 0 0 / 0.3);
-}
-
-.color-card>label {
-    font-size: 11px;
-    text-transform: none;
-    letter-spacing: 1.5px;
-    color: #64748b;
-    font-weight: 600;
-    margin-bottom: 4px;
 }
 
 .color-value {
@@ -106,15 +98,15 @@ input {
 }
 
 .color-value>div.red {
-    background-color: oklch(85% 0.12 30);
+    background-color: oklch(85% 0.06 30);
 }
 
 .color-value>div.green {
-    background-color: oklch(85% 0.12 150);
+    background-color: oklch(85% 0.06 150);
 }
 
 .color-value>div.blue {
-    background-color: oklch(85% 0.12 270);
+    background-color: oklch(85% 0.06 270);
 }
 
 .color-value>div>label {
@@ -181,36 +173,77 @@ button.color-alert:hover {
 }
 
 button.color-alert.clip {
-    background-color: oklch(90% 0.06 20);
+    background-color: oklch(90% 0.1 20);
 }
 
 button.color-alert.clip:hover {
-    background-color: oklch(85% 0.06 20);
+    background-color: oklch(85% 0.1 20);
 }
 
 button.color-alert.overdrive {
-    background-color: oklch(90% 0.06 60);
+    background-color: oklch(90% 0.1 60);
 }
 
 button.color-alert.overdrive:hover {
-    background-color: oklch(85% 0.06 60);
+    background-color: oklch(85% 0.1 60);
 }
 
 .card-description {
-    display: flex;
+    display: grid;
+    grid-template-rows: 1fr;
     position: relative;
     background-color: oklch(97% 0 0);
     color: oklab(0% 0 0);
     box-shadow: 0 4px 4px oklab(0 0 0 / 0.1);
     border-radius: 8px;
-    align-items: center;
-    transition: outline-width 0.05s;
     outline-style: solid;
     outline-color: #6366f1;
     outline-width: 0;
-    flex-grow: 0;
     margin: 8px;
-    padding: 10px 24px
+    overflow: hidden;
+    transition: grid-template-rows 0.35s ease, margin 0.35s ease;
+}
+
+.card-description.collapsed {
+    grid-template-rows: 0fr;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.card-description>a {
+    padding: 10px 24px;
+    overflow: hidden;
+}
+
+.details-toggle {
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 1.5px;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.details-toggle:hover {
+    color: #334155;
+}
+
+.toggle-icon {
+    display: inline-block;
+    transition: transform 0.35s ease;
+    font-size: 10px;
+}
+
+.details-toggle[aria-expanded="true"] .toggle-icon {
+    transform: rotate(90deg);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -219,63 +252,79 @@ button.color-alert.overdrive:hover {
         color: oklab(90% 0 0);
     }
 
-    .color-card {
+    .card {
         background: oklab(30% 0 0);
         transition: background-color 0.3s;
         box-shadow: 0;
     }
 
-    .color-card:hover {
+    .card:hover {
         background: oklab(32% 0 0);
     }
 
-    .color-card>div>div {
+    .card>div>div {
         box-shadow: 0;
         outline-width: 0.5px;
-        background-color: oklab(40% 0 0);
-        outline-color: oklch(65% 0 0);
+        background-color: oklab(25% 0 0);
+        outline-color: oklch(40% 0 0);
         color: oklch(85% 0 0);
     }
 
-    .color-card>div>div.red {
-        background-color: oklch(40% 0.05 30);
-        outline-color: oklch(65% 0.12 30);
+    .card>div>div.red {
+        background-color: oklch(25% 0.02 30);
+        outline-color: oklch(40% 0.12 30);
         color: oklch(85% 0.12 30);
     }
 
-    .color-card>div>div.green {
-        background-color: oklch(40% 0.05 150);
-        outline-color: oklch(65% 0.12 150);
+    .card>div>div.green {
+        background-color: oklch(25% 0.02 150);
+        outline-color: oklch(40% 0.12 150);
         color: oklch(85% 0.12 150);
     }
 
-    .color-card>div>div.blue {
-        background-color: oklch(40% 0.05 270);
-        outline-color: oklch(65% 0.12 270);
+    .card>div>div.blue {
+        background-color: oklch(25% 0.02 270);
+        outline-color: oklch(40% 0.12 270);
         color: oklch(85% 0.12 270);
     }
 
-    .color-card>div>div>input {
-        background-color: oklab(30% 0 0);
+    .card>div>div>input {
+        background-color: oklab(25% 0 0);
         transition: background-color 0.3s;
         color: oklab(95% 0 0);
     }
 
     @container cards-column (width < 400px) {
-        .color-card>div>div>input {
-            background-color: oklab(40% 0 0);
+        .card>div>div>input {
+            background-color: oklab(25% 0 0);
         }
 
-        .color-card>div>div.red>input {
-            background-color: oklch(40% 0.05 30);
+        .card>div>div.red>input {
+            background-color: oklch(25% 0.02 30);
         }
 
-        .color-card>div>div.green>input {
-            background-color: oklch(40% 0.05 150);
+        .card>div>div.green>input {
+            background-color: oklch(25% 0.02 150);
         }
 
-        .color-card>div>div.blue>input {
-            background-color: oklch(40% 0.05 270);
+        .card>div>div.blue>input {
+            background-color: oklch(25% 0.02 270);
         }
+    }
+
+    .card-description {
+        background-color: oklch(30% 0 0);
+    }
+
+    .card-description>a {
+        color: oklab(90% 0 0);
+    }
+
+    .details-toggle {
+        color: #94a3b8;
+    }
+
+    .details-toggle:hover {
+        color: #e2e8f0;
     }
 }
