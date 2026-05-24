@@ -204,6 +204,14 @@ function updateAll(r, g, b, source) {
     const [labL, labA, labB] = lmsToOklab(lmsL, lmsM, lmsS);
     const [lchL, lchC, lchH] = oklabToOklch(labL, labA, labB);
 
+    const tintL = lchL * 100;
+    const tintC = Math.max(0, lchC);
+    const tintH = ((lchH % 1) + 1) % 1 * 360;
+    document.documentElement.style.setProperty(
+        '--color-tint',
+        `oklch(${tintL.toFixed(1)}% ${tintC.toFixed(3)} ${tintH.toFixed(1)})`
+    );
+
     if (source !== 'srgb-float:rgb') {
         els.srgbR.value = r.toFixed(valPrcs);
         els.srgbG.value = g.toFixed(valPrcs);

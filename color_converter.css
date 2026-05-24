@@ -5,9 +5,9 @@
 body {
     display: flex;
     flex-flow: column;
-    background: oklab(100% 0 0);
+    background: color-mix(in oklch, var(--color-tint) 10%, oklab(100% 0 0));
     color: oklab(0% 0 0);
-    transition: color 0.3s;
+    transition: background 0.6s ease;
 }
 
 input {
@@ -46,9 +46,9 @@ input {
     display: flex;
     flex-flow: column;
     padding: 10px;
-    background: oklab(95% 0 0);
+    background: color-mix(in oklch, var(--color-tint) 5%, oklab(95% 0 0));
     border-radius: 12px;
-    transition: box-shadow 0.3s;
+    transition: box-shadow 0.3s, background 0.6s;
     box-shadow: 0 4px 10px oklab(0 0 0 / 0.3);
     width: 100%;
     min-width: 300px;
@@ -248,18 +248,19 @@ button.color-alert.overdrive:hover {
 
 @media (prefers-color-scheme: dark) {
     body {
-        background: oklab(20% 0 0);
+        background: color-mix(in oklch, var(--color-tint) 10%, oklab(20% 0 0));
         color: oklab(90% 0 0);
     }
 
     .card {
-        background: oklab(30% 0 0);
-        transition: background-color 0.3s;
+        --tinted: color-mix(in oklch, var(--color-tint) 10%, oklab(30% 0 0));
+        background: var(--tinted);
+        transition: box-shadow 0.3s, background-color 0.6s, --tinted 0.6s ease;
         box-shadow: 0;
     }
 
     .card:hover {
-        background: oklab(32% 0 0);
+        --tinted: color-mix(in oklch, var(--color-tint) 5%, oklab(30% 0 0));
     }
 
     .card>div>div {
