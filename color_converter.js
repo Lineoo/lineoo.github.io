@@ -152,22 +152,6 @@ function srgbFloatToUintClamped(r, g, b) {
 
 // ===== UI Logic =====// 
 
-const masonry = new Masonry('.color-cards-grid', {
-    itemSelector: '.color-card',
-    columnWidth: '.color-card',
-    gutter: 20,
-    percentPosition: true,
-    transitionDuration: '0.1s'
-});
-
-let resizeDebounce;
-window.addEventListener('resize', () => {
-    clearTimeout(resizeDebounce);
-    resizeDebounce = setTimeout(() => {
-        masonry.layout();
-    }, 100);
-});
-
 let updating = false;
 
 const initSrgb = [0.24, 0.53, 0.95];

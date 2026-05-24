@@ -25,10 +25,20 @@ input {
     text-align: center;
 }
 
-.color-cards-grid {
-    position: relative;
+.cards-row {
+    display: flex;
+    flex-flow: row;
+    flex-wrap: wrap;
+    gap: 0 20px;
+}
+
+.cards-column {
+    display: flex;
+    flex-flow: column;
+    flex-grow: 1;
+    flex-basis: 300px;
     container-type: inline-size;
-    container-name: cards-grid;
+    container-name: cards-column;
 }
 
 .color-card {
@@ -45,13 +55,13 @@ input {
     box-sizing: border-box;
 }
 
-@container cards-grid (width > 1000px) {
+@container cards-column (width > 1000px) {
     .color-card {
         width: calc(50% - 10px);
     }
 }
 
-@container cards-grid (width > 2000px) {
+@container cards-column (width > 2000px) {
     .color-card {
         width: calc(33% - 10px);
     }
@@ -70,12 +80,12 @@ input {
     margin-bottom: 4px;
 }
 
-.color-card>div {
+.color-value {
     display: flex;
     justify-content: space-evenly;
 }
 
-.color-card>div>div {
+.color-value>div {
     display: flex;
     position: relative;
     background-color: oklab(85% 0 0);
@@ -91,23 +101,23 @@ input {
     margin: 8px;
 }
 
-.color-card>div>div:focus-within {
+.color-value>div:focus-within {
     outline-width: 2px;
 }
 
-.color-card>div>div.red {
+.color-value>div.red {
     background-color: oklch(85% 0.12 30);
 }
 
-.color-card>div>div.green {
+.color-value>div.green {
     background-color: oklch(85% 0.12 150);
 }
 
-.color-card>div>div.blue {
+.color-value>div.blue {
     background-color: oklch(85% 0.12 270);
 }
 
-.color-card>div>div>label {
+.color-value>div>label {
     padding: 0 10px;
     font-size: 11px;
     text-overflow: clip;
@@ -118,15 +128,15 @@ input {
     max-width: max-content;
 }
 
-@container cards-grid (width < 400px) {
-    .color-card>div>div>label {
+@container cards-column (width < 400px) {
+    .color-value>div>label {
         color: transparent;
         padding: 0;
         width: 0;
     }
 }
 
-.color-card>div>div>input {
+.color-value>div>input {
     background: oklab(97% 0 0);
     border-radius: 8px;
     padding: 8px 12px;
@@ -137,7 +147,7 @@ input {
     width: 0;
 }
 
-.color-card>div>div>div {
+.color-value>div>div {
     display: flex;
     position: absolute;
     right: 2px;
@@ -155,7 +165,7 @@ button.color-alert {
     width: 12px;
 }
 
-@container cards-grid (width < 600px) {
+@container cards-column (width < 600px) {
     button.color-alert {
         color: transparent;
         width: 2px;
@@ -184,6 +194,23 @@ button.color-alert.overdrive {
 
 button.color-alert.overdrive:hover {
     background-color: oklch(85% 0.06 60);
+}
+
+.card-description {
+    display: flex;
+    position: relative;
+    background-color: oklch(97% 0 0);
+    color: oklab(0% 0 0);
+    box-shadow: 0 4px 4px oklab(0 0 0 / 0.1);
+    border-radius: 8px;
+    align-items: center;
+    transition: outline-width 0.05s;
+    outline-style: solid;
+    outline-color: #6366f1;
+    outline-width: 0;
+    flex-grow: 0;
+    margin: 8px;
+    padding: 10px 24px
 }
 
 @media (prefers-color-scheme: dark) {
@@ -234,7 +261,7 @@ button.color-alert.overdrive:hover {
         color: oklab(95% 0 0);
     }
 
-    @container cards-grid (width < 400px) {
+    @container cards-column (width < 400px) {
         .color-card>div>div>input {
             background-color: oklab(40% 0 0);
         }
