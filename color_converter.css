@@ -10,8 +10,17 @@
     --fg-muted: #64748b;
     --fg-muted-hover: #334155;
 
-    --outline: #6366f1;
     --shadow: oklab(0 0 0 / 0.1);
+
+    --outline-grey: oklch(0.58 0.2 280);
+    --outline-red: oklch(0.58 0.1 30);
+    --outline-green: oklch(0.58 0.1 150);
+    --outline-blue: oklch(0.58 0.1 270);
+
+    --text-grey: oklab(0% 0 0);
+    --text-red: oklab(0% 0 0);
+    --text-green: oklab(0% 0 0);
+    --text-blue: oklab(0% 0 0);
 
     --field-grey: oklab(93% 0 0);
     --field-red: oklch(90% 0.06 30);
@@ -104,13 +113,13 @@ input {
     display: flex;
     position: relative;
     background-color: var(--field-grey);
-    color: var(--fg);
+    outline-color: var(--outline-grey);
+    color: var(--text-grey);
     box-shadow: 0 4px 4px var(--shadow);
     border-radius: 8px;
     align-items: center;
     transition: outline-width 0.05s;
     outline-style: solid;
-    outline-color: var(--outline);
     outline-width: 0;
     flex-grow: 1;
     margin: 8px;
@@ -122,14 +131,20 @@ input {
 
 .color-value>div.red {
     background-color: var(--field-red);
+    outline-color: var(--outline-red);
+    color: var(--text-red);
 }
 
 .color-value>div.green {
     background-color: var(--field-green);
+    outline-color: var(--outline-green);
+    color: var(--text-green);
 }
 
 .color-value>div.blue {
     background-color: var(--field-blue);
+    outline-color: var(--outline-blue);
+    color: var(--text-blue);
 }
 
 .color-value>div>label {
@@ -251,7 +266,7 @@ button.color-alert.overdrive:hover {
     color: var(--fg);
     border-radius: 8px;
     outline-style: solid;
-    outline-color: var(--outline);
+    outline-color: var(--outline-grey);
     outline-width: 0;
     margin: 8px;
     overflow: hidden;
@@ -311,8 +326,17 @@ button.color-alert.overdrive:hover {
         --fg-muted: #94a3b8;
         --fg-muted-hover: #e2e8f0;
 
-        --outline: oklch(40% 0 0);
         --shadow: none;
+
+        --outline-grey: oklch(40% 0 0);
+        --outline-red: oklch(40% 0.12 30);
+        --outline-green: oklch(40% 0.12 150);
+        --outline-blue: oklch(40% 0.12 270);
+
+        --text-grey: oklab(90% 0 0);
+        --text-red: oklch(85% 0.12 30);
+        --text-green: oklch(85% 0.12 150);
+        --text-blue: oklch(85% 0.12 270);
 
         --field-grey: oklab(25% 0 0);
         --field-red: oklch(25% 0.02 30);
@@ -331,20 +355,5 @@ button.color-alert.overdrive:hover {
     .color-value>div {
         box-shadow: 0;
         outline-width: 0.5px;
-    }
-
-    .color-value>div.red {
-        outline-color: oklch(40% 0.12 30);
-        color: oklch(85% 0.12 30);
-    }
-
-    .color-value>div.green {
-        outline-color: oklch(40% 0.12 150);
-        color: oklch(85% 0.12 150);
-    }
-
-    .color-value>div.blue {
-        outline-color: oklch(40% 0.12 270);
-        color: oklch(85% 0.12 270);
     }
 }

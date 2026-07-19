@@ -276,15 +276,11 @@ function writeHs(space, v) {
 
 // ---- Plane drawing ----
 
-let _cnt = 0;
-
 function drawColorPlane(canvas, colorFn, mx, my) {
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     if (rect.width < 10 || rect.height < 10) return;
     const dpr = window.devicePixelRatio || 1;
-
-    _cnt += 1;
 
     const w = Math.floor(rect.width * dpr);
     const h = Math.floor(rect.height * dpr);
@@ -326,7 +322,7 @@ function drawColorPlane(canvas, colorFn, mx, my) {
 function drawAllPlanes() {
     for (const cfg of PLANES) {
         const canvas = document.getElementById(cfg.id);
-        if (!canvas) continue;
+        if (!canvas || canvas.parentElement.classList.contains('collapsed')) continue;
         const v = readHs(cfg.space);
 
         const xMin = cfg.xMin ?? 0, xMax = cfg.xMax ?? 1;
