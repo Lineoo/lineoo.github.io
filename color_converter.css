@@ -1,13 +1,37 @@
 :root {
     font-family: system-ui, sans-serif;
+
+    --bg: oklab(100% 0 0);
+    --bg-card: oklab(95% 0 0);
+    --bg-field: oklab(85% 0 0);
+    --bg-input: oklab(97% 0 0);
+    --bg-desc: oklch(97% 0 0);
+    --bg-btn: oklch(90% 0 0);
+    --bg-btn-hover: oklch(85% 0 0);
+
+    --fg: oklab(0% 0 0);
+    --fg-muted: #64748b;
+    --fg-muted-hover: #334155;
+
+    --outline: #6366f1;
+    --red: oklch(85% 0.06 30);
+    --green: oklch(85% 0.06 150);
+    --blue: oklch(85% 0.06 270);
+
+    --shadow-sm: oklab(0 0 0 / 0.1);
+    --shadow-md: oklab(0 0 0 / 0.3);
+
+    --alert-clip: oklch(90% 0.1 20);
+    --alert-clip-hover: oklch(85% 0.1 20);
+    --alert-overdrive: oklch(90% 0.1 60);
+    --alert-overdrive-hover: oklch(85% 0.1 60);
 }
 
 body {
     display: flex;
     flex-flow: column;
-    background: color-mix(in oklch, var(--color-tint) 10%, oklab(100% 0 0));
-    color: oklab(0% 0 0);
-    transition: background 0.6s ease;
+    background: var(--bg);
+    color: var(--fg);
 }
 
 input {
@@ -46,10 +70,10 @@ input {
     display: flex;
     flex-flow: column;
     padding: 10px;
-    background: color-mix(in oklch, var(--color-tint) 5%, oklab(95% 0 0));
+    background: var(--bg-card);
     border-radius: 12px;
-    transition: box-shadow 0.3s, background 0.6s;
-    box-shadow: 0 4px 10px oklab(0 0 0 / 0.3);
+    transition: box-shadow 0.3s;
+    box-shadow: 0 4px 10px var(--shadow-md);
     width: 100%;
     min-width: 300px;
     margin-bottom: 20px;
@@ -69,7 +93,7 @@ input {
 }
 
 .card:hover {
-    box-shadow: 0 4px 20px oklab(0 0 0 / 0.3);
+    box-shadow: 0 4px 20px var(--shadow-md);
 }
 
 .color-value {
@@ -80,14 +104,14 @@ input {
 .color-value>div {
     display: flex;
     position: relative;
-    background-color: oklab(85% 0 0);
-    color: oklab(0% 0 0);
-    box-shadow: 0 4px 4px oklab(0 0 0 / 0.1);
+    background-color: var(--bg-field);
+    color: var(--fg);
+    box-shadow: 0 4px 4px var(--shadow-sm);
     border-radius: 8px;
     align-items: center;
     transition: outline-width 0.05s;
     outline-style: solid;
-    outline-color: #6366f1;
+    outline-color: var(--outline);
     outline-width: 0;
     flex-grow: 1;
     margin: 8px;
@@ -98,15 +122,15 @@ input {
 }
 
 .color-value>div.red {
-    background-color: oklch(85% 0.06 30);
+    background-color: var(--red);
 }
 
 .color-value>div.green {
-    background-color: oklch(85% 0.06 150);
+    background-color: var(--green);
 }
 
 .color-value>div.blue {
-    background-color: oklch(85% 0.06 270);
+    background-color: var(--blue);
 }
 
 .color-value>div>label {
@@ -129,10 +153,10 @@ input {
 }
 
 .color-value>div>input {
-    background: oklab(97% 0 0);
+    background: var(--bg-input);
     border-radius: 8px;
     padding: 8px 12px;
-    color: #000000;
+    color: var(--fg);
     font-size: 14px;
     flex-grow: 1;
     font-family: monospace;
@@ -165,39 +189,72 @@ button.color-alert {
 }
 
 button.color-alert {
-    background-color: oklch(90% 0 0);
+    background-color: var(--bg-btn);
 }
 
 button.color-alert:hover {
-    background-color: oklch(85% 0 0);
+    background-color: var(--bg-btn-hover);
 }
 
 button.color-alert.clip {
-    background-color: oklch(90% 0.1 20);
+    background-color: var(--alert-clip);
 }
 
 button.color-alert.clip:hover {
-    background-color: oklch(85% 0.1 20);
+    background-color: var(--alert-clip-hover);
 }
 
 button.color-alert.overdrive {
-    background-color: oklch(90% 0.1 60);
+    background-color: var(--alert-overdrive);
 }
 
 button.color-alert.overdrive:hover {
-    background-color: oklch(85% 0.1 60);
+    background-color: var(--alert-overdrive-hover);
+}
+
+.color-planes {
+    display: flex;
+    gap: 8px;
+    margin: 8px;
+    max-height: 200px;
+    overflow: hidden;
+    transition: max-height 0.35s ease, margin 0.35s ease;
+}
+
+.color-planes.collapsed {
+    max-height: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.color-plane {
+    flex: 1;
+    min-width: 0;
+    height: 100px;
+    min-height: 50px;
+    border-radius: 8px;
+    cursor: crosshair;
+    display: block;
+    touch-action: none;
+}
+
+@container cards-column (width < 500px) {
+    .color-plane {
+        height: 70px;
+        min-height: 36px;
+    }
 }
 
 .card-description {
     display: grid;
     grid-template-rows: 1fr;
     position: relative;
-    background-color: oklch(97% 0 0);
-    color: oklab(0% 0 0);
-    box-shadow: 0 4px 4px oklab(0 0 0 / 0.1);
+    background-color: var(--bg-desc);
+    color: var(--fg);
+    box-shadow: 0 4px 4px var(--shadow-sm);
     border-radius: 8px;
     outline-style: solid;
-    outline-color: #6366f1;
+    outline-color: var(--outline);
     outline-width: 0;
     margin: 8px;
     overflow: hidden;
@@ -219,7 +276,7 @@ button.color-alert.overdrive:hover {
     font-size: 11px;
     text-transform: none;
     letter-spacing: 1.5px;
-    color: #64748b;
+    color: var(--fg-muted);
     font-weight: 600;
     margin-bottom: 4px;
     background: none;
@@ -233,7 +290,7 @@ button.color-alert.overdrive:hover {
 }
 
 .details-toggle:hover {
-    color: #334155;
+    color: var(--fg-muted-hover);
 }
 
 .toggle-icon {
@@ -247,85 +304,62 @@ button.color-alert.overdrive:hover {
 }
 
 @media (prefers-color-scheme: dark) {
-    body {
-        background: color-mix(in oklch, var(--color-tint) 10%, oklab(20% 0 0));
-        color: oklab(90% 0 0);
+    :root {
+        --bg: oklab(20% 0 0);
+        --bg-card: oklab(30% 0 0);
+        --bg-field: oklab(25% 0 0);
+        --bg-input: oklab(25% 0 0);
+        --bg-desc: oklch(30% 0 0);
+        --fg: oklab(90% 0 0);
+        --fg-muted: #94a3b8;
+        --fg-muted-hover: #e2e8f0;
+        --outline: oklch(40% 0 0);
+        --red: oklch(25% 0.02 30);
+        --green: oklch(25% 0.02 150);
+        --blue: oklch(25% 0.02 270);
+        --shadow-sm: none;
+        --shadow-md: none;
     }
 
     .card {
-        --tinted: color-mix(in oklch, var(--color-tint) 10%, oklab(30% 0 0));
-        background: var(--tinted);
-        transition: box-shadow 0.3s, background-color 0.6s, --tinted 0.6s ease;
         box-shadow: 0;
     }
 
     .card:hover {
-        --tinted: color-mix(in oklch, var(--color-tint) 5%, oklab(30% 0 0));
+        background: oklab(32% 0 0);
     }
 
     .card>div>div {
         box-shadow: 0;
         outline-width: 0.5px;
-        background-color: oklab(25% 0 0);
-        outline-color: oklch(40% 0 0);
-        color: oklch(85% 0 0);
     }
 
     .card>div>div.red {
-        background-color: oklch(25% 0.02 30);
         outline-color: oklch(40% 0.12 30);
         color: oklch(85% 0.12 30);
     }
 
     .card>div>div.green {
-        background-color: oklch(25% 0.02 150);
         outline-color: oklch(40% 0.12 150);
         color: oklch(85% 0.12 150);
     }
 
     .card>div>div.blue {
-        background-color: oklch(25% 0.02 270);
         outline-color: oklch(40% 0.12 270);
         color: oklch(85% 0.12 270);
     }
 
-    .card>div>div>input {
-        background-color: oklab(25% 0 0);
-        transition: background-color 0.3s;
-        color: oklab(95% 0 0);
-    }
-
     @container cards-column (width < 400px) {
-        .card>div>div>input {
-            background-color: oklab(25% 0 0);
-        }
-
         .card>div>div.red>input {
-            background-color: oklch(25% 0.02 30);
+            background-color: var(--red);
         }
 
         .card>div>div.green>input {
-            background-color: oklch(25% 0.02 150);
+            background-color: var(--green);
         }
 
         .card>div>div.blue>input {
-            background-color: oklch(25% 0.02 270);
+            background-color: var(--blue);
         }
-    }
-
-    .card-description {
-        background-color: oklch(30% 0 0);
-    }
-
-    .card-description>a {
-        color: oklab(90% 0 0);
-    }
-
-    .details-toggle {
-        color: #94a3b8;
-    }
-
-    .details-toggle:hover {
-        color: #e2e8f0;
     }
 }

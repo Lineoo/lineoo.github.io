@@ -136,6 +136,17 @@ function oklabToOklch(L, a, b) {
     return [L, C, H - Math.floor(H)];
 }
 
+function oklabToSrgb(L, a, b) {
+    const [l, m, s] = oklabToLms(L, a, b);
+    const [linR, linG, linB] = lmsToSrgbLinear(l, m, s);
+    return srgbLinearToSensitive(linR, linG, linB);
+}
+
+function oklchToSrgb(L, C, H) {
+    const [, a, b] = oklchToOklab(L, C, H);
+    return oklabToSrgb(L, a, b);
+}
+
 // Formatting
 
 function hexToRgb(hex) {
@@ -191,6 +202,152 @@ const els = {
     lmsM: document.getElementById('lms:m'),
     lmsS: document.getElementById('lms:s'),
 };
+
+// ---- Color plane configuration ----
+
+const PLANES = [
+    { id: 'hsl-hl', space: 'hsl', x: 'h', y: 'l' },
+    { id: 'hsl-hs', space: 'hsl', x: 'h', y: 's' },
+    { id: 'hsl-sl', space: 'hsl', x: 's', y: 'l' },
+    { id: 'hsv-hv', space: 'hsv', x: 'h', y: 'v' },
+    { id: 'hsv-hs', space: 'hsv', x: 'h', y: 's' },
+    { id: 'hsv-sv', space: 'hsv', x: 's', y: 'v' },
+    { id: 'oklab-la', space: 'oklab', x: 'a', y: 'L', xMin: -0.4, xMax: 0.4 },
+    { id: 'oklab-lb', space: 'oklab', x: 'b', y: 'L', xMin: -0.4, xMax: 0.4 },
+    { id: 'oklab-ab', space: 'oklab', x: 'a', y: 'b', xMin: -0.4, xMax: 0.4, yMin: -0.4, yMax: 0.4 },
+    { id: 'oklch-lc', space: 'oklch', x: 'C', y: 'L', xMax: 0.4 },
+    { id: 'oklch-lh', space: 'oklch', x: 'H', y: 'L' },
+    { id: 'oklch-ch', space: 'oklch', x: 'H', y: 'C', yMax: 0.4 },
+];
+
+function readHs(space) {
+    if (space === 'hsl') {
+        return {
+            h: parseFloat(els.hslH.value) || 0,
+            s: parseFloat(els.hslS.value) || 0,
+            l: parseFloat(els.hslL.value) || 0,
+        };
+    }
+    if (space === 'hsv') {
+        return {
+            h: parseFloat(els.hsvH.value) || 0,
+            s: parseFloat(els.hsvS.value) || 0,
+            v: parseFloat(els.hsvV.value) || 0,
+        };
+    }
+    if (space === 'oklab') {
+        return {
+            L: parseFloat(els.oklabL.value) || 0,
+            a: parseFloat(els.oklabA.value) || 0,
+            b: parseFloat(els.oklabB.value) || 0,
+        };
+    }
+    return {
+        L: parseFloat(els.oklchL.value) || 0,
+        C: parseFloat(els.oklchC.value) || 0,
+        H: parseFloat(els.oklchH.value) || 0,
+    };
+}
+
+function hsToSrgb(space, v) {
+    if (space === 'hsl') return hslToSrgb(v.h, v.s, v.l);
+    if (space === 'hsv') return hsvToSrgb(v.h, v.s, v.v);
+    if (space === 'oklab') return oklabToSrgb(v.L, v.a, v.b);
+    return oklchToSrgb(v.L, v.C, v.H);
+}
+
+function writeHs(space, v) {
+    if (space === 'hsl') {
+        els.hslH.value = v.h.toFixed(dgrPrcs);
+        els.hslS.value = v.s.toFixed(valPrcs);
+        els.hslL.value = v.l.toFixed(valPrcs);
+        els.hslHsl.value = `hsl(${v.h.toFixed(dgrPrcs)}, ${v.s.toFixed(valPrcs)}, ${v.l.toFixed(valPrcs)})`;
+    } else if (space === 'hsv') {
+        els.hsvH.value = v.h.toFixed(dgrPrcs);
+        els.hsvS.value = v.s.toFixed(valPrcs);
+        els.hsvV.value = v.v.toFixed(valPrcs);
+    } else if (space === 'oklab') {
+        els.oklabL.value = v.L.toFixed(valPrcs);
+        els.oklabA.value = v.a.toFixed(valPrcs);
+        els.oklabB.value = v.b.toFixed(valPrcs);
+        els.oklabOklab.value = `oklab(${v.L.toFixed(valPrcs)} ${v.a.toFixed(valPrcs)} ${v.b.toFixed(valPrcs)})`;
+    } else {
+        els.oklchL.value = v.L.toFixed(valPrcs);
+        els.oklchC.value = v.C.toFixed(valPrcs);
+        els.oklchH.value = v.H.toFixed(dgrPrcs);
+        els.oklchOklch.value = `oklch(${v.L.toFixed(valPrcs)} ${v.C.toFixed(valPrcs)} ${v.H.toFixed(dgrPrcs)})`;
+    }
+}
+
+// ---- Plane drawing ----
+
+function drawColorPlane(canvas, colorFn, mx, my) {
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width < 10 || rect.height < 10) return;
+    const dpr = window.devicePixelRatio || 1;
+
+    const w = Math.floor(rect.width * dpr);
+    const h = Math.floor(rect.height * dpr);
+    canvas.width = w;
+    canvas.height = h;
+
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(w, h);
+
+    for (let py = 0; py < h; py++) {
+        for (let px = 0; px < w; px++) {
+            const [r, g, b] = colorFn(px / w, py / h);
+            const idx = (py * w + px) * 4;
+            const inGamut = r >= 0 && r <= 1 && g >= 0 && g <= 1 && b >= 0 && b <= 1;
+            imageData.data[idx] = Math.round(Math.max(0, Math.min(1, r)) * 255);
+            imageData.data[idx + 1] = Math.round(Math.max(0, Math.min(1, g)) * 255);
+            imageData.data[idx + 2] = Math.round(Math.max(0, Math.min(1, b)) * 255);
+            imageData.data[idx + 3] = inGamut ? 255 : 0;
+        }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+
+    const cx = mx * w;
+    const cy = my * h;
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7.5, 0, Math.PI * 2);
+    ctx.strokeStyle = 'oklch(0% 0 0)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.strokeStyle = 'oklch(100% 0 0)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+}
+
+function drawPlane(cfg) {
+    const canvas = document.getElementById(cfg.id);
+    if (!canvas) return;
+    const v = readHs(cfg.space);
+
+    const xMin = cfg.xMin ?? 0, xMax = cfg.xMax ?? 1;
+    const yMin = cfg.yMin ?? 0, yMax = cfg.yMax ?? 1;
+
+    drawColorPlane(
+        canvas,
+        (x, y) => {
+            const vals = { ...v };
+            vals[cfg.x] = xMin + x * (xMax - xMin);
+            vals[cfg.y] = yMin + (1 - y) * (yMax - yMin);
+            return hsToSrgb(cfg.space, vals);
+        },
+        (v[cfg.x] - xMin) / (xMax - xMin),
+        1 - (v[cfg.y] - yMin) / (yMax - yMin)
+    );
+}
+
+function drawAllPlanes() {
+    for (const cfg of PLANES) drawPlane(cfg);
+}
 
 function updateAll(r, g, b, source) {
     if (updating) return;
@@ -299,6 +456,8 @@ ${uintB.toString(16).padStart(2, '0')}`;
         els.lmsM.value = lmsM.toFixed(valPrcs);
         els.lmsS.value = lmsS.toFixed(valPrcs);
     }
+
+    drawAllPlanes();
 
     updating = false;
 }
@@ -441,4 +600,99 @@ document.addEventListener('click', function (e) {
 
     toggle.setAttribute('aria-expanded', !expanded);
     description.classList.toggle('collapsed', expanded);
+});
+
+let resizeTimeout;
+window.addEventListener('resize', function () {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(drawAllPlanes, 100);
+});
+
+const pickTimeLimit = 100;
+
+let dragPlane = null;
+let dragCfg = null;
+let lastDragTime = 0;
+
+function pickFromPlane(canvas, cfg, clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const xn = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const yn = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+
+    const xMin = cfg.xMin ?? 0, xMax = cfg.xMax ?? 1;
+    const yMin = cfg.yMin ?? 0, yMax = cfg.yMax ?? 1;
+
+    const v = readHs(cfg.space);
+    v[cfg.x] = xMin + xn * (xMax - xMin);
+    v[cfg.y] = yMin + (1 - yn) * (yMax - yMin);
+
+    const source = { hsl: 'hsl:hsl', hsv: 'hsv:hsv', oklab: 'oklab:lab', oklch: 'oklch:lch' }[cfg.space];
+
+    const [r, g, b] = hsToSrgb(cfg.space, v);
+    writeHs(cfg.space, v);
+    updateAll(r, g, b, source);
+}
+
+function startDrag(e) {
+    const canvas = e.target.closest('.color-plane');
+    if (!canvas) return;
+    const cfg = PLANES.find(p => p.id === canvas.id);
+    if (!cfg) return;
+
+    dragPlane = canvas;
+    dragCfg = cfg;
+    lastDragTime = 0;
+    pickFromPlane(canvas, cfg, e.clientX, e.clientY);
+    e.preventDefault();
+}
+
+function moveDrag(e) {
+    if (!dragPlane) return;
+    const now = Date.now();
+    if (now - lastDragTime < pickTimeLimit) return;
+    lastDragTime = now;
+    pickFromPlane(dragPlane, dragCfg, e.clientX, e.clientY);
+    e.preventDefault();
+}
+
+function stopDrag() {
+    dragPlane = null;
+    dragCfg = null;
+}
+
+function startTouchDrag(e) {
+    const canvas = e.target.closest('.color-plane');
+    if (!canvas) return;
+    const cfg = PLANES.find(p => p.id === canvas.id);
+    if (!cfg) return;
+
+    dragPlane = canvas;
+    dragCfg = cfg;
+    lastDragTime = 0;
+    const touch = e.touches[0];
+    pickFromPlane(canvas, cfg, touch.clientX, touch.clientY);
+    e.preventDefault();
+}
+
+function moveTouchDrag(e) {
+    if (!dragPlane) return;
+    const now = Date.now();
+    if (now - lastDragTime < pickTimeLimit) return;
+    lastDragTime = now;
+    const touch = e.touches[0];
+    pickFromPlane(dragPlane, dragCfg, touch.clientX, touch.clientY);
+    e.preventDefault();
+}
+
+document.addEventListener('mousedown', startDrag);
+document.addEventListener('mousemove', moveDrag);
+document.addEventListener('mouseup', stopDrag);
+document.addEventListener('touchstart', startTouchDrag, { passive: false });
+document.addEventListener('touchmove', moveTouchDrag, { passive: false });
+document.addEventListener('touchend', stopDrag);
+
+document.addEventListener('transitionend', function (e) {
+    if (e.target.classList.contains('color-planes') && !e.target.classList.contains('collapsed')) {
+        drawAllPlanes();
+    }
 });

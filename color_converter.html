@@ -88,6 +88,14 @@
           <div class="color-value">
             <div><label>CSS</label><input id="hsl.hsl" readonly></div>
           </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="planes-hsl">
+            HSL Palette <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="planes-hsl" class="color-planes collapsed">
+            <canvas id="hsl-hl" class="color-plane"></canvas>
+            <canvas id="hsl-hs" class="color-plane"></canvas>
+            <canvas id="hsl-sl" class="color-plane"></canvas>
+          </div>
         </div>
 
         <!-- HSV -->
@@ -105,6 +113,14 @@
             <div><label>H</label><input id="hsv:h"></div>
             <div><label>S</label><input id="hsv:s"></div>
             <div><label>V</label><input id="hsv:v"></div>
+          </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="planes-hsv">
+            HSV Palette <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="planes-hsv" class="color-planes collapsed">
+            <canvas id="hsv-hv" class="color-plane"></canvas>
+            <canvas id="hsv-hs" class="color-plane"></canvas>
+            <canvas id="hsv-sv" class="color-plane"></canvas>
           </div>
         </div>
 
@@ -128,6 +144,14 @@
           <div class="color-value">
             <div><label>CSS</label><input id="oklab.oklab" readonly></div>
           </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="planes-oklab">
+            OKLab Palette <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="planes-oklab" class="color-planes collapsed">
+            <canvas id="oklab-la" class="color-plane"></canvas>
+            <canvas id="oklab-lb" class="color-plane"></canvas>
+            <canvas id="oklab-ab" class="color-plane"></canvas>
+          </div>
         </div>
 
         <!-- OKLCH -->
@@ -147,6 +171,14 @@
           </div>
           <div class="color-value">
             <div><label>CSS</label><input id="oklch.oklch" readonly></div>
+          </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="planes-oklch">
+            OKLCH Palette <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="planes-oklch" class="color-planes collapsed">
+            <canvas id="oklch-lc" class="color-plane"></canvas>
+            <canvas id="oklch-lh" class="color-plane"></canvas>
+            <canvas id="oklch-ch" class="color-plane"></canvas>
           </div>
         </div>
 
