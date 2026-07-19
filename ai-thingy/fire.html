@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebGPU 火焰效果</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gpuCanvas"></canvas>
+    <script type="module">
+        // --- 1. 获取 Canvas 并初始化 WebGPU 设备 ---
+        const canvas = document.getElementById('gpuCanvas');
+        const adapter = await navigator.gpu?.requestAdapter();
+        if (!adapter) {
+            alert('您的浏览器不支持 WebGPU，请使用 Chrome 或 Edge 等最新版本。');
+            throw new Error('WebGPU not supported');
+        }
+        const device = await adapter.requestDevice();
+        const context = canvas.getContext('webgpu');
+        const format = navigator.gpu.getPreferredCanvasFormat();
+        context.configure({
+            device,
+            format,
+            alphaMode: 'opaque',
+        });
+
+        // --- 2. 定义着色器代码 (WGSL) ---
+        const shaderCode = `
+            // 时间 Uniform
+            @group(0) @binding(0) var<uniform> time: f32;
+
+            // 噪声函数：用于生成火焰的不规则形状
+            fn hash(p: vec3f) -> f32 {
+                p = fract(p * 0.3183099 + .1);
+                p *= 17.0;
+                return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+            }
+
+            fn noise(p: vec3f) -> f32 {
+                let i = floor(p);
+                let f = fract(p);
+                let u = f * f * (3.0 - 2.0 * f);
+                return mix(
+                    mix(mix(hash(i + vec3f(0,0,0)), hash(i + vec3f(1,0,0)), u.x),
+                        mix(hash(i + vec3f(0,1,0)), hash(i + vec3f(1,1,0)), u.x), u.y),
+                    mix(mix(hash(i + vec3f(0,0,1)), hash(i + vec3f(1,0,1)), u.x),
+                        mix(hash(i + vec3f(0,1,1)), hash(i + vec3f(1,1,1)), u.x), u.y),
+                    u.z
+                );
+            }
+
+            // 分形布朗运动：叠加多层噪声，产生更丰富的细节
+            fn fbm(p: vec3f) -> f32 {
+                var value = 0.0;
+                var amplitude = 0.5;
+                var frequency = 1.0;
+                for (var i = 0; i < 5; i = i + 1) {
+                    value += amplitude * noise(p * frequency);
+                    amplitude *= 0.5;
+                    frequency *= 2.0;
+                }
+                return value;
+            }
+
+            // 场景符号距离函数 (SDF)：定义一个被噪声扭曲的圆柱体，作为火焰的主体
+            fn map(p: vec3f) -> f32 {
+                // 火焰沿 Y 轴向上，将坐标沿 Y 轴拉伸，使其呈锥形
+                let height = 2.5;
+                let radius = 1.2 * (1.0 - p.y / height);
+                // 基础圆柱体 SDF
+                let cyl = length(p.xz) - radius;
+
+                // 使用分形噪声扭曲圆柱体表面
+                let distortion = fbm(p * 1.5 + vec3f(0.0, time * 0.3, 0.0)) * 0.4;
+                return cyl + distortion;
+            }
+
+            // 光线步进主函数
+            fn rayMarch(ro: vec3f, rd: vec3f) -> f32 {
+                var t = 0.0;
+                for (var i = 0; i < 64; i = i + 1) {
+                    let p = ro + rd * t;
+                    let d = map(p);
+                    if (d < 0.001) {
+                        return t;
+                    }
+                    t += d * 0.8;
+                    if (t > 10.0) {
+                        break;
+                    }
+                }
+                return -1.0;
+            }
+
+            // 片元着色器主函数
+            @fragment
+            fn main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
+                // 将屏幕坐标映射到 [-1, 1] 范围
+                let uv = (pos.xy / vec2f(800.0, 600.0)) * 2.0 - 1.0;
+                // 修正宽高比
+                let aspect = 800.0 / 600.0;
+                let rayDir = normalize(vec3f(uv.x * aspect, uv.y, 1.5));
+
+                // 相机位置
+                let rayOrigin = vec3f(0.0, 0.2, -2.8);
+
+                // 执行光线步进
+                let dist = rayMarch(rayOrigin, rayDir);
+
+                // 根据距离计算颜色
+                if (dist > 0.0) {
+                    let hitPos = rayOrigin + rayDir * dist;
+                    // 使用位置和时间的组合计算火焰颜色
+                    let intensity = 1.0 - hitPos.y / 2.8;
+                    let color1 = vec3f(1.0, 0.6, 0.1); // 橙色
+                    let color2 = vec3f(1.0, 0.9, 0.2); // 黄色
+                    let color3 = vec3f(0.2, 0.1, 0.0); // 深色底部
+                    let mixVal = clamp((hitPos.y * 0.6 + 0.4), 0.0, 1.0);
+                    var col = mix(color3, color1, mixVal);
+                    col = mix(col, color2, smoothstep(0.3, 0.9, intensity));
+                    // 增加一点蓝色调在顶部
+                    col = mix(col, vec3f(0.4, 0.2, 0.6), smoothstep(0.7, 1.2, hitPos.y));
+                    // 边缘发光效果
+                    let glow = exp(-dist * 0.5) * 0.6;
+                    col += vec3f(0.8, 0.3, 0.05) * glow;
+                    return vec4f(col, 1.0);
+                } else {
+                    // 背景：纯黑色，略带一点点深红色光晕
+                    return vec4f(0.02, 0.005, 0.0, 1.0);
+                }
+            }
+        `;
+
+        // --- 3. 创建着色器模块和管线 ---
+        const shaderModule = device.createShaderModule({
+            code: shaderCode,
+        });
+
+        // 绑定组布局
+        const bindGroupLayout = device.createBindGroupLayout({
+            entries: [{
+                binding: 0,
+                visibility: GPUShaderStage.FRAGMENT,
+                buffer: { type: 'uniform' },
+            }, ],
+        });
+
+        const pipelineLayout = device.createPipelineLayout({
+            bindGroupLayouts: [bindGroupLayout],
+        });
+
+        const pipeline = device.createRenderPipeline({
+            layout: pipelineLayout,
+            vertex: {
+                module: shaderModule,
+                entryPoint: 'main',
+            },
+            fragment: {
+                module: shaderModule,
+                entryPoint: 'main',
+                targets: [{ format }],
+            },
+            primitive: {
+                topology: 'triangle-strip',
+                stripIndexFormat: 'uint32',
+            },
+        });
+
+        // --- 4. 准备 Uniform 缓冲区 (用于传递时间) ---
+        const uniformBuffer = device.createBuffer({
+            size: 4,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
+        const bindGroup = device.createBindGroup({
+            layout: bindGroupLayout,
+            entries: [{
+                binding: 0,
+                resource: { buffer: uniformBuffer },
+            }, ],
+        });
+
+        // --- 5. 渲染循环 ---
+        let startTime = performance.now();
+
+        function render() {
+            // 更新 Uniform 中的时间
+            const elapsed = (performance.now() - startTime) / 1000.0;
+            const timeData = new Float32Array([elapsed]);
+            device.queue.writeBuffer(uniformBuffer, 0, timeData);
+
+            // 创建命令编码器
+            const encoder = device.createCommandEncoder();
+            const textureView = context.getCurrentTexture().createView();
+
+            const renderPass = encoder.beginRenderPass({
+                colorAttachments: [{
+                    view: textureView,
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                    clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+                }, ],
+            });
+
+            renderPass.setPipeline(pipeline);
+            renderPass.setBindGroup(0, bindGroup);
+            renderPass.draw(4, 1, 0, 0);
+            renderPass.end();
+
+            device.queue.submit([encoder.finish()]);
+            requestAnimationFrame(render);
+        }
+
+        // --- 6. 处理窗口大小变化 ---
+        function resizeCanvas() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            // 注意：这里没有更新着色器里的分辨率，为了简化示例，我们硬编码了 800x600。
+            // 在实际项目中，你需要将分辨率作为 uniform 传入。
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 启动渲染
+        render();
+    </script>
+</body>
+</html>
