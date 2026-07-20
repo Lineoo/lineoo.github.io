@@ -253,6 +253,7 @@ button.color-alert.invalid:hover {
     max-height: 200px;
     overflow: hidden;
     transition: max-height 0.35s ease, margin 0.35s ease;
+    justify-content: center;
 }
 
 .color-planes.collapsed {
@@ -263,19 +264,29 @@ button.color-alert.invalid:hover {
 
 .color-plane {
     flex: 1;
+    aspect-ratio: 16 / 9;
+    min-height: 100px;
     min-width: 0;
-    height: 100px;
-    min-height: 50px;
     cursor: crosshair;
-    display: block;
     touch-action: none;
 }
 
-@container cards-column (width < 500px) {
-    .color-plane {
-        height: 70px;
-        min-height: 36px;
-    }
+.polar-wheel {
+    flex: none;
+    aspect-ratio: 1;
+    min-height: 200px;
+    min-width: 200px;
+    cursor: crosshair;
+    touch-action: none;
+}
+
+.polar-bar {
+    flex: none;
+    width: 20px;
+    min-height: 200px;
+    min-width: 20px;
+    border-radius: 8px;
+    touch-action: none;
 }
 
 .card-description {

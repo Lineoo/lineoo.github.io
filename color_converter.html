@@ -47,6 +47,14 @@
           <div class="color-value">
             <div><label>CSS</label><input id="srgb-float.color" readonly></div>
           </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="planes-srgb">
+            sRGB Palette <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="planes-srgb" class="color-planes collapsed">
+            <canvas id="srgb-rg" class="color-plane"></canvas>
+            <canvas id="srgb-rb" class="color-plane"></canvas>
+            <canvas id="srgb-gb" class="color-plane"></canvas>
+          </div>
 
           <button class="details-toggle" aria-expanded="false" aria-controls="desc-srgb-linear">
             Linear <span class="toggle-icon" aria-hidden="true">▸</span>
@@ -66,6 +74,14 @@
           </div>
           <div class="color-value">
             <div><label>WGSL</label><input id="srgb-linear.wgsl" readonly></div>
+          </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="planes-srgb-linear">
+            Linear Palette <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="planes-srgb-linear" class="color-planes collapsed">
+            <canvas id="lin-rg" class="color-plane"></canvas>
+            <canvas id="lin-rb" class="color-plane"></canvas>
+            <canvas id="lin-gb" class="color-plane"></canvas>
           </div>
         </div>
 
@@ -96,6 +112,13 @@
             <canvas id="hsl-hs" class="color-plane"></canvas>
             <canvas id="hsl-sl" class="color-plane"></canvas>
           </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="polar-hsl">
+            HSL Polar <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="polar-hsl" class="color-planes collapsed">
+            <canvas id="hsl-wheel" class="color-plane polar-wheel"></canvas>
+            <canvas id="hsl-bar" class="color-plane polar-bar"></canvas>
+          </div>
         </div>
 
         <!-- HSV -->
@@ -121,6 +144,13 @@
             <canvas id="hsv-hv" class="color-plane"></canvas>
             <canvas id="hsv-hs" class="color-plane"></canvas>
             <canvas id="hsv-sv" class="color-plane"></canvas>
+          </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="polar-hsv">
+            HSV Polar <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="polar-hsv" class="color-planes collapsed">
+            <canvas id="hsv-wheel" class="color-plane polar-wheel"></canvas>
+            <canvas id="hsv-bar" class="color-plane polar-bar"></canvas>
           </div>
         </div>
 
@@ -180,6 +210,13 @@
             <canvas id="oklch-lh" class="color-plane"></canvas>
             <canvas id="oklch-ch" class="color-plane"></canvas>
           </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="polar-oklch">
+            OKLCH Polar <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="polar-oklch" class="color-planes collapsed">
+            <canvas id="oklch-wheel" class="color-plane polar-wheel"></canvas>
+            <canvas id="oklch-bar" class="color-plane polar-bar"></canvas>
+          </div>
         </div>
 
         <!-- LMS -->
@@ -198,8 +235,15 @@
             <div><label>M</label><input id="lms:m"></div>
             <div><label>S</label><input id="lms:s"></div>
           </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="planes-lms">
+            LMS Palette <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="planes-lms" class="color-planes collapsed">
+            <canvas id="lms-lm" class="color-plane"></canvas>
+            <canvas id="lms-ls" class="color-plane"></canvas>
+            <canvas id="lms-ms" class="color-plane"></canvas>
+          </div>
         </div>
-
       </div>
     </div>
 

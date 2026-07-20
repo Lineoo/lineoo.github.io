@@ -206,6 +206,15 @@ const els = {
 // ---- Color plane configuration ----
 
 const PLANES = [
+    { id: 'srgb-rg', space: 'srgb', x: 'r', y: 'g' },
+    { id: 'srgb-rb', space: 'srgb', x: 'r', y: 'b' },
+    { id: 'srgb-gb', space: 'srgb', x: 'g', y: 'b' },
+    { id: 'lin-rg', space: 'srgb-linear', x: 'R', y: 'G' },
+    { id: 'lin-rb', space: 'srgb-linear', x: 'R', y: 'B' },
+    { id: 'lin-gb', space: 'srgb-linear', x: 'G', y: 'B' },
+    { id: 'lms-lm', space: 'lms', x: 'L', y: 'M' },
+    { id: 'lms-ls', space: 'lms', x: 'L', y: 'S' },
+    { id: 'lms-ms', space: 'lms', x: 'M', y: 'S' },
     { id: 'hsl-hl', space: 'hsl', x: 'h', y: 'l' },
     { id: 'hsl-hs', space: 'hsl', x: 'h', y: 's' },
     { id: 'hsl-sl', space: 'hsl', x: 's', y: 'l' },
@@ -220,7 +229,37 @@ const PLANES = [
     { id: 'oklch-ch', space: 'oklch', x: 'H', y: 'C', yMax: 0.4 },
 ];
 
+const POLARS = [
+    { id: 'hsl-wheel',  space: 'hsl',   type: 'wheel', rad: 's', ang: 'h', fix: 'l' },
+    { id: 'hsl-bar',    space: 'hsl',   type: 'bar',   var: 'l', hue: 'h', sat: 's' },
+    { id: 'hsv-wheel',  space: 'hsv',   type: 'wheel', rad: 's', ang: 'h', fix: 'v' },
+    { id: 'hsv-bar',    space: 'hsv',   type: 'bar',   var: 'v', hue: 'h', sat: 's' },
+    { id: 'oklch-wheel', space: 'oklch', type: 'wheel', rad: 'C', ang: 'H', fix: 'L', radMax: 0.4 },
+    { id: 'oklch-bar',  space: 'oklch', type: 'bar',   var: 'L', hue: 'H', sat: 'C' },
+];
+
 const SPACE_META = {
+    srgb: {
+        keys: ['r', 'g', 'b'],
+        els: ['srgbR', 'srgbG', 'srgbB'],
+        precs: [valPrcs, valPrcs, valPrcs],
+        toSrgb: v => [v.r, v.g, v.b],
+        source: 'srgb-float:rgb',
+    },
+    'srgb-linear': {
+        keys: ['R', 'G', 'B'],
+        els: ['srgbLinearR', 'srgbLinearG', 'srgbLinearB'],
+        precs: [valPrcs, valPrcs, valPrcs],
+        toSrgb: v => srgbLinearToSensitive(v.R, v.G, v.B),
+        source: 'srgb-linear:rgb',
+    },
+    lms: {
+        keys: ['L', 'M', 'S'],
+        els: ['lmsL', 'lmsM', 'lmsS'],
+        precs: [valPrcs, valPrcs, valPrcs],
+        toSrgb: v => srgbLinearToSensitive(...lmsToSrgbLinear(v.L, v.M, v.S)),
+        source: 'lms:lms',
+    },
     hsl: {
         keys: ['h', 's', 'l'],
         els: ['hslH', 'hslS', 'hslL'],
@@ -295,10 +334,17 @@ function drawColorPlane(canvas, colorFn, mx, my) {
             const [r, g, b] = colorFn(px / w, py / h);
             const idx = (py * w + px) * 4;
             const inGamut = r >= 0 && r <= 1 && g >= 0 && g <= 1 && b >= 0 && b <= 1;
-            imageData.data[idx] = Math.round(Math.max(0, Math.min(1, r)) * 255);
-            imageData.data[idx + 1] = Math.round(Math.max(0, Math.min(1, g)) * 255);
-            imageData.data[idx + 2] = Math.round(Math.max(0, Math.min(1, b)) * 255);
-            imageData.data[idx + 3] = inGamut ? 255 : 0;
+            if (inGamut) {
+                imageData.data[idx] = Math.round(r * 255);
+                imageData.data[idx + 1] = Math.round(g * 255);
+                imageData.data[idx + 2] = Math.round(b * 255);
+                imageData.data[idx + 3] = 255;
+            } else {
+                imageData.data[idx] = 99;
+                imageData.data[idx + 1] = 99;
+                imageData.data[idx + 2] = 99;
+                imageData.data[idx + 3] = 20;
+            }
         }
     }
 
@@ -314,6 +360,120 @@ function drawColorPlane(canvas, colorFn, mx, my) {
     ctx.stroke();
     ctx.beginPath();
     ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.strokeStyle = 'oklch(100% 0 0)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+}
+
+function drawWheel(canvas, space, radKey, angKey, fixKey, radMax) {
+    if (!canvas) return;
+    radMax = radMax || 1;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width < 10 || rect.height < 10) return;
+    const dpr = window.devicePixelRatio || 1;
+
+    const w = Math.floor(rect.width * dpr);
+    const h = Math.floor(rect.height * dpr);
+    canvas.width = w;
+    canvas.height = h;
+
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(w, h);
+    const cx = w / 2, cy = h / 2, maxR = Math.min(w, h) / 2;
+    const v = readHs(space);
+
+    for (let py = 0; py < h; py++) {
+        for (let px = 0; px < w; px++) {
+            const dx = px - cx, dy = py - cy;
+            const r = Math.sqrt(dx * dx + dy * dy);
+            const idx = (py * w + px) * 4;
+            if (r > maxR) { imageData.data[idx + 3] = 0; continue; }
+
+            const angle = (Math.atan2(-dy, dx) + Math.PI * 2) % (Math.PI * 2);
+            const vals = { ...v };
+            vals[radKey] = (r / maxR) * radMax;
+            vals[angKey] = angle / (Math.PI * 2);
+
+            const [cr, cg, cb] = hsToSrgb(space, vals);
+            const inGamut = cr >= 0 && cr <= 1 && cg >= 0 && cg <= 1 && cb >= 0 && cb <= 1;
+            if (inGamut) {
+                imageData.data[idx] = Math.round(cr * 255);
+                imageData.data[idx + 1] = Math.round(cg * 255);
+                imageData.data[idx + 2] = Math.round(cb * 255);
+                imageData.data[idx + 3] = 255;
+            } else {
+                imageData.data[idx] = 99;
+                imageData.data[idx + 1] = 99;
+                imageData.data[idx + 2] = 99;
+                imageData.data[idx + 3] = 20;
+            }
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+
+    const rad = (v[radKey] || 0) / radMax, ang = (v[angKey] || 0) * Math.PI * 2;
+    const mx = cx + rad * maxR * Math.cos(ang);
+    const my = cy - rad * maxR * Math.sin(ang);
+
+    ctx.beginPath();
+    ctx.arc(mx, my, 7.5, 0, Math.PI * 2);
+    ctx.strokeStyle = 'oklch(0% 0 0)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(mx, my, 6, 0, Math.PI * 2);
+    ctx.strokeStyle = 'oklch(100% 0 0)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+}
+
+function drawBar(canvas, space, varKey, hueKey, satKey) {
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width < 10 || rect.height < 10) return;
+    const dpr = window.devicePixelRatio || 1;
+
+    const w = Math.floor(rect.width * dpr);
+    const h = Math.floor(rect.height * dpr);
+    canvas.width = w;
+    canvas.height = h;
+
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(w, h);
+    const v = readHs(space);
+
+    for (let py = 0; py < h; py++) {
+        for (let px = 0; px < w; px++) {
+            const vals = { ...v };
+            vals[varKey] = 1 - py / h;
+            const [cr, cg, cb] = hsToSrgb(space, vals);
+            const idx = (py * w + px) * 4;
+            const inGamut = cr >= 0 && cr <= 1 && cg >= 0 && cg <= 1 && cb >= 0 && cb <= 1;
+            if (inGamut) {
+                imageData.data[idx] = Math.round(cr * 255);
+                imageData.data[idx + 1] = Math.round(cg * 255);
+                imageData.data[idx + 2] = Math.round(cb * 255);
+                imageData.data[idx + 3] = 255;
+            } else {
+                imageData.data[idx] = 99;
+                imageData.data[idx + 1] = 99;
+                imageData.data[idx + 2] = 99;
+                imageData.data[idx + 3] = 20;
+            }
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+
+    const val = v[varKey] || 0;
+    const y = (1 - val) * h;
+
+    ctx.beginPath();
+    ctx.arc(w / 2, y, 7.5, 0, Math.PI * 2);
+    ctx.strokeStyle = 'oklch(0% 0 0)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(w / 2, y, 6, 0, Math.PI * 2);
     ctx.strokeStyle = 'oklch(100% 0 0)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
@@ -347,6 +507,13 @@ function drawAllPlanes() {
             (v[cfg.x] - xMin) / (xMax - xMin),
             1 - (v[cfg.y] - yMin) / (yMax - yMin)
         );
+    }
+
+    for (const p of POLARS) {
+        const canvas = document.getElementById(p.id);
+        if (!canvas || canvas.parentElement.classList.contains('collapsed')) continue;
+        if (p.type === 'wheel') drawWheel(canvas, p.space, p.rad, p.ang, p.fix, p.radMax);
+        else drawBar(canvas, p.space, p.var, p.hue, p.sat);
     }
 }
 
@@ -616,16 +783,34 @@ function pickFromPlane(canvas, cfg, clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
     const xn = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     const yn = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
-
-    const xMin = cfg.xMin ?? 0, xMax = cfg.xMax ?? 1;
-    const yMin = cfg.yMin ?? 0, yMax = cfg.yMax ?? 1;
-
     const v = readHs(cfg.space);
-    v[cfg.x] = xMin + xn * (xMax - xMin);
-    v[cfg.y] = yMin + (1 - yn) * (yMax - yMin);
+
+    if (cfg.type === 'wheel') {
+        const dx = xn - 0.5, dy = 0.5 - yn;
+        const rad = Math.min(1, Math.sqrt(dx * dx + dy * dy) * 2);
+        const ang = (Math.atan2(dy, dx) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2);
+        v[cfg.rad] = rad * (cfg.radMax || 1);
+        v[cfg.ang] = ang;
+    } else if (cfg.type === 'bar') {
+        v[cfg.var] = 1 - yn;
+    } else {
+        const xMin = cfg.xMin ?? 0, xMax = cfg.xMax ?? 1;
+        const yMin = cfg.yMin ?? 0, yMax = cfg.yMax ?? 1;
+        v[cfg.x] = xMin + xn * (xMax - xMin);
+        v[cfg.y] = yMin + (1 - yn) * (yMax - yMin);
+    }
 
     const source = SPACE_META[cfg.space].source;
-    const [r, g, b] = SPACE_META[cfg.space].toSrgb(v);
+    let [r, g, b] = SPACE_META[cfg.space].toSrgb(v);
+
+    if (cfg.space === 'hsl' || cfg.space === 'hsv') {
+        const cr = Math.max(0, Math.min(1, r));
+        const cg = Math.max(0, Math.min(1, g));
+        const cb = Math.max(0, Math.min(1, b));
+        const outOfGamut = cr !== r || cg !== g || cb !== b;
+        SPACE_META[cfg.space].els.forEach(e => color_invalid(outOfGamut, els[e]));
+        r = cr; g = cg; b = cb;
+    }
 
     writeHs(cfg.space, v);
     updateAll(r, g, b, source);
@@ -636,7 +821,7 @@ function pickFromPlane(canvas, cfg, clientX, clientY) {
 function startPlaneDrag(e, clientX, clientY) {
     const canvas = e.target.closest('.color-plane');
     if (!canvas) return;
-    const cfg = PLANES.find(p => p.id === canvas.id);
+    const cfg = PLANES.find(p => p.id === canvas.id) || POLARS.find(p => p.id === canvas.id);
     if (!cfg) return;
     dragPlane = canvas;
     dragCfg = cfg;
