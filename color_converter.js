@@ -546,6 +546,25 @@ const INPUT_SPACES = [
     { keys: ['lmsL', 'lmsM', 'lmsS'], toSrgb: (l, m, s) => srgbLinearToSensitive(...lmsToSrgbLinear(l, m, s)), source: 'lms:lms' },
 ];
 
+INPUT_SPACES.forEach(def => def.keys.forEach(k => {
+    const el = els[k];
+    el.classList.add('drag');
+    const label = el.parentElement.querySelector('label');
+    if (label) label.classList.add('drag');
+}));
+
+function tryParseHex(hex) {
+    hex = hex.replace(/^#/, '').trim();
+    if (!/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(hex)) return null;
+    return hexToRgb(hex);
+}
+
+els.srgbHex.addEventListener('input', () => {
+    const rgb = tryParseHex(els.srgbHex.value);
+    if (!rgb) return;
+    updateAll(rgb[0], rgb[1], rgb[2], 'srgb-uint.hex');
+});
+
 INPUT_SPACES.forEach(def => {
     def.keys.forEach(key => {
         els[key].addEventListener('input', () => {
@@ -637,7 +656,7 @@ function startLabelDrag(e, clientX) {
     const label = e.target.closest('.color-value>div>label');
     if (!label) return;
     const input = label.parentElement.querySelector('input');
-    if (!input || input.readOnly) return;
+    if (!input || !input.classList.contains('drag')) return;
     dragLabel = label;
     dragLabelInput = input;
     dragLabelInitX = clientX;
