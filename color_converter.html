@@ -85,6 +85,128 @@
           </div>
         </div>
 
+        <!-- Display P3 -->
+        <div class="card">
+          <button class="details-toggle" aria-expanded="false" aria-controls="desc-p3">
+            P3 <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div class="card-description collapsed" id="desc-p3">
+            <a>Display P3 是由 Apple 推广的广色域 RGB 色彩空间，采用 DCI-P3 主色配合 D65 白点。相较于 sRGB，P3 色域大约宽
+              25%，可呈现更加鲜艳的红色和绿色。该色彩空间广泛应用于现代 iPhone、Mac 及 HDR 显示器中。其传递函数与 sRGB 完全一致，均使用约 2.2
+              的伽马值，因此兼容性较好。网页中使用 <code>color(display-p3 r g b)</code> 语法进行颜色表示。</a>
+          </div>
+          <div class="color-value">
+            <div class="red"><label>R</label><input id="p3:r"></div>
+            <div class="green"><label>G</label><input id="p3:g"></div>
+            <div class="blue"><label>B</label><input id="p3:b"></div>
+          </div>
+          <div class="color-value">
+            <div><label>CSS</label><input id="p3.color" readonly></div>
+          </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="planes-p3">
+            P3 Palette <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="planes-p3" class="color-planes collapsed">
+            <canvas id="p3-rg" class="color-plane"></canvas>
+            <canvas id="p3-rb" class="color-plane"></canvas>
+            <canvas id="p3-gb" class="color-plane"></canvas>
+          </div>
+        </div>
+
+        <!-- Rec.2020 -->
+        <div class="card">
+          <button class="details-toggle" aria-expanded="false" aria-controls="desc-rec2020">
+            Rec.2020 <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div class="card-description collapsed" id="desc-rec2020">
+            <a>BT.2020 是 ITU-R 为 4K/8K UHDTV 制定的色彩空间标准，主色采用单色波长（630nm 红、532nm 绿、467nm
+              蓝），是目前消费级最宽的 RGB 色彩空间。其传递函数不同于 sRGB，使用了 α=1.0993,
+              β=0.0181 的编码参数，线性段斜率高达 4.5 倍。该色彩空间覆盖了人眼可感知的大部分色域，通常只在高端的专业参考显示器中才能完全呈现。网页中使用
+              <code>color(rec2020 r g b)</code> 语法进行颜色表示。</a>
+          </div>
+          <div class="color-value">
+            <div class="red"><label>R</label><input id="rec2020:r"></div>
+            <div class="green"><label>G</label><input id="rec2020:g"></div>
+            <div class="blue"><label>B</label><input id="rec2020:b"></div>
+          </div>
+          <div class="color-value">
+            <div><label>CSS</label><input id="rec2020.color" readonly></div>
+          </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="planes-rec2020">
+            Rec.2020 Palette <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="planes-rec2020" class="color-planes collapsed">
+            <canvas id="rec2020-rg" class="color-plane"></canvas>
+            <canvas id="rec2020-rb" class="color-plane"></canvas>
+            <canvas id="rec2020-gb" class="color-plane"></canvas>
+          </div>
+        </div>
+
+      </div>
+      <div class="cards-column">
+
+        <!-- OKLab -->
+        <div class="card">
+          <button class="details-toggle" aria-expanded="false" aria-controls="desc-oklab">
+            OKLab <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div class="card-description collapsed" id="desc-oklab">
+            <a>OKLab 是 2020 年由 Björn Ottosson 提出的一种感知均匀色彩空间。它由明度 L 和两个色度分量 a、b 构成，旨在解决经典 CIELAB 空间在蓝色区域出现明显色调偏移的问题。OKLab
+              能较好地保持色相的感知恒定，且在数字图像处理（如生成平滑渐变、调整饱和度、色调映射）时更加自然。它的转换仅涉及矩阵运算和立方根，计算简单高效，正逐渐被各类新式图像工具和色彩库采纳。</a>
+          </div>
+          <div class="color-value">
+            <div><label>L</label><input id="oklab:l"></div>
+            <div><label>a</label><input id="oklab:a"></div>
+            <div><label>b</label><input id="oklab:b"></div>
+          </div>
+          <div class="color-value">
+            <div><label>CSS</label><input id="oklab.oklab" readonly></div>
+          </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="planes-oklab">
+            OKLab Palette <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="planes-oklab" class="color-planes collapsed">
+            <canvas id="oklab-la" class="color-plane"></canvas>
+            <canvas id="oklab-lb" class="color-plane"></canvas>
+            <canvas id="oklab-ab" class="color-plane"></canvas>
+          </div>
+        </div>
+
+        <!-- OKLCH -->
+        <div class="card">
+          <button class="details-toggle" aria-expanded="false" aria-controls="desc-oklch">
+            OKLCH <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div class="card-description collapsed" id="desc-oklch">
+            <a>OKLch 是 OKLab 空间的极坐标形式，与 Lch 色彩模型类似：L 依然表示明度，C 为彩度（Chroma，即颜色的鲜艳程度），h
+              为色相角度（Hue）。因为坐标直接对应人类对颜色的直觉 ——"这是什么颜色？多鲜艳？多亮？"——OKLch 在调色板生成、设计工具以及 Web 开发中非常友好。例如 CSS Color Level 4 已原生支持
+              oklch() 函数，方便设计师创建感知均匀的渐变和色彩系统。</a>
+          </div>
+          <div class="color-value">
+            <div><label>L</label><input id="oklch:l"></div>
+            <div><label>C</label><input id="oklch:c"></div>
+            <div><label>H</label><input id="oklch:h"></div>
+          </div>
+          <div class="color-value">
+            <div><label>CSS</label><input id="oklch.oklch" readonly></div>
+          </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="planes-oklch">
+            OKLCH Palette <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="planes-oklch" class="color-planes collapsed">
+            <canvas id="oklch-lc" class="color-plane"></canvas>
+            <canvas id="oklch-lh" class="color-plane"></canvas>
+            <canvas id="oklch-ch" class="color-plane"></canvas>
+          </div>
+          <button class="details-toggle" aria-expanded="false" aria-controls="polar-oklch">
+            OKLCH Polar <span class="toggle-icon" aria-hidden="true">▸</span>
+          </button>
+          <div id="polar-oklch" class="color-planes collapsed">
+            <canvas id="oklch-wheel" class="color-plane polar-wheel"></canvas>
+            <canvas id="oklch-bar" class="color-plane polar-bar"></canvas>
+          </div>
+        </div>
+
         <!-- HSL -->
         <div class="card">
           <button class="details-toggle" aria-expanded="false" aria-controls="desc-hsl">
@@ -151,71 +273,6 @@
           <div id="polar-hsv" class="color-planes collapsed">
             <canvas id="hsv-wheel" class="color-plane polar-wheel"></canvas>
             <canvas id="hsv-bar" class="color-plane polar-bar"></canvas>
-          </div>
-        </div>
-
-      </div>
-      <div class="cards-column">
-
-        <!-- OKLab -->
-        <div class="card">
-          <button class="details-toggle" aria-expanded="false" aria-controls="desc-oklab">
-            OKLab <span class="toggle-icon" aria-hidden="true">▸</span>
-          </button>
-          <div class="card-description collapsed" id="desc-oklab">
-            <a>OKLab 是 2020 年由 Björn Ottosson 提出的一种感知均匀色彩空间。它由明度 L 和两个色度分量 a、b 构成，旨在解决经典 CIELAB 空间在蓝色区域出现明显色调偏移的问题。OKLab
-              能较好地保持色相的感知恒定，且在数字图像处理（如生成平滑渐变、调整饱和度、色调映射）时更加自然。它的转换仅涉及矩阵运算和立方根，计算简单高效，正逐渐被各类新式图像工具和色彩库采纳。</a>
-          </div>
-          <div class="color-value">
-            <div><label>L</label><input id="oklab:l"></div>
-            <div><label>a</label><input id="oklab:a"></div>
-            <div><label>b</label><input id="oklab:b"></div>
-          </div>
-          <div class="color-value">
-            <div><label>CSS</label><input id="oklab.oklab" readonly></div>
-          </div>
-          <button class="details-toggle" aria-expanded="false" aria-controls="planes-oklab">
-            OKLab Palette <span class="toggle-icon" aria-hidden="true">▸</span>
-          </button>
-          <div id="planes-oklab" class="color-planes collapsed">
-            <canvas id="oklab-la" class="color-plane"></canvas>
-            <canvas id="oklab-lb" class="color-plane"></canvas>
-            <canvas id="oklab-ab" class="color-plane"></canvas>
-          </div>
-        </div>
-
-        <!-- OKLCH -->
-        <div class="card">
-          <button class="details-toggle" aria-expanded="false" aria-controls="desc-oklch">
-            OKLCH <span class="toggle-icon" aria-hidden="true">▸</span>
-          </button>
-          <div class="card-description collapsed" id="desc-oklch">
-            <a>OKLch 是 OKLab 空间的极坐标形式，与 Lch 色彩模型类似：L 依然表示明度，C 为彩度（Chroma，即颜色的鲜艳程度），h
-              为色相角度（Hue）。因为坐标直接对应人类对颜色的直觉 ——"这是什么颜色？多鲜艳？多亮？"——OKLch 在调色板生成、设计工具以及 Web 开发中非常友好。例如 CSS Color Level 4 已原生支持
-              oklch() 函数，方便设计师创建感知均匀的渐变和色彩系统。</a>
-          </div>
-          <div class="color-value">
-            <div><label>L</label><input id="oklch:l"></div>
-            <div><label>C</label><input id="oklch:c"></div>
-            <div><label>H</label><input id="oklch:h"></div>
-          </div>
-          <div class="color-value">
-            <div><label>CSS</label><input id="oklch.oklch" readonly></div>
-          </div>
-          <button class="details-toggle" aria-expanded="false" aria-controls="planes-oklch">
-            OKLCH Palette <span class="toggle-icon" aria-hidden="true">▸</span>
-          </button>
-          <div id="planes-oklch" class="color-planes collapsed">
-            <canvas id="oklch-lc" class="color-plane"></canvas>
-            <canvas id="oklch-lh" class="color-plane"></canvas>
-            <canvas id="oklch-ch" class="color-plane"></canvas>
-          </div>
-          <button class="details-toggle" aria-expanded="false" aria-controls="polar-oklch">
-            OKLCH Polar <span class="toggle-icon" aria-hidden="true">▸</span>
-          </button>
-          <div id="polar-oklch" class="color-planes collapsed">
-            <canvas id="oklch-wheel" class="color-plane polar-wheel"></canvas>
-            <canvas id="oklch-bar" class="color-plane polar-bar"></canvas>
           </div>
         </div>
 

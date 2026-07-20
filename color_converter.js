@@ -147,6 +147,89 @@ function oklchToSrgb(L, C, H) {
     return oklabToSrgb(L, a, b);
 }
 
+// XYZ matrices (D65 white point)
+
+function mul3x3(m, v) {
+    return [
+        m[0]*v[0] + m[1]*v[1] + m[2]*v[2],
+        m[3]*v[0] + m[4]*v[1] + m[5]*v[2],
+        m[6]*v[0] + m[7]*v[1] + m[8]*v[2],
+    ];
+}
+
+function inv3x3(m) {
+    const d = m[0]*(m[4]*m[8]-m[5]*m[7]) - m[1]*(m[3]*m[8]-m[5]*m[6]) + m[2]*(m[3]*m[7]-m[4]*m[6]);
+    return [
+        (m[4]*m[8]-m[5]*m[7])/d, (m[2]*m[7]-m[1]*m[8])/d, (m[1]*m[5]-m[2]*m[4])/d,
+        (m[5]*m[6]-m[3]*m[8])/d, (m[0]*m[8]-m[2]*m[6])/d, (m[2]*m[3]-m[0]*m[5])/d,
+        (m[3]*m[7]-m[4]*m[6])/d, (m[1]*m[6]-m[0]*m[7])/d, (m[0]*m[4]-m[1]*m[3])/d,
+    ];
+}
+
+// sRGB <-> XYZ
+const sRgbToXyzM = [
+    0.4123908 , 0.35758434, 0.18048079,
+    0.21263901, 0.71516868, 0.07219232,
+    0.01933082, 0.11919478, 0.95053215,
+];
+const xyzToSRgbM = inv3x3(sRgbToXyzM);
+
+function srgbToXyz(r, g, b) { return mul3x3(sRgbToXyzM, [r, g, b]); }
+function xyzToSrgb(x, y, z)  { return mul3x3(xyzToSRgbM, [x, y, z]);  }
+
+// Display P3 <-> sRGB
+
+const p3ToXyzM = [
+    0.48657095, 0.26566769, 0.19821729,
+    0.22897456, 0.69173852, 0.07928691,
+    0.00000000, 0.04511338, 1.04394437,
+];
+const xyzToP3M = inv3x3(p3ToXyzM);
+
+function p3ToSrgb(r, g, b) {
+    const [lr, lg, lb] = srgbSensitiveToLinear(r, g, b);
+    const [x, y, z] = mul3x3(p3ToXyzM, [lr, lg, lb]);
+    return srgbLinearToSensitive(...mul3x3(xyzToSRgbM, [x, y, z]));
+}
+
+function srgbToP3(r, g, b) {
+    const [lr, lg, lb] = srgbSensitiveToLinear(r, g, b);
+    const [x, y, z] = mul3x3(sRgbToXyzM, [lr, lg, lb]);
+    return srgbLinearToSensitive(...mul3x3(xyzToP3M, [x, y, z]));
+}
+
+// Rec.2020 <-> sRGB
+
+const rec2020ToXyzM = [
+    0.63697360, 0.14462057, 0.16885575,
+    0.26270669, 0.67799807, 0.05929524,
+    0.00000000, 0.02807269, 1.06098508,
+];
+const xyzToRec2020M = inv3x3(rec2020ToXyzM);
+
+function rec2020Encode(l) {
+    if (l < 0.0181) return 4.5 * l;
+    return 1.0993 * Math.pow(l, 0.45) - 0.0993;
+}
+
+function rec2020Decode(v) {
+    if (v < 0.08145) return v / 4.5;
+    return Math.pow((v + 0.0993) / 1.0993, 1 / 0.45);
+}
+
+function rec2020ToSrgb(r, g, b) {
+    const lr = rec2020Decode(r), lg = rec2020Decode(g), lb = rec2020Decode(b);
+    const [x, y, z] = mul3x3(rec2020ToXyzM, [lr, lg, lb]);
+    return srgbLinearToSensitive(...mul3x3(xyzToSRgbM, [x, y, z]));
+}
+
+function srgbToRec2020(r, g, b) {
+    const [lr, lg, lb] = srgbSensitiveToLinear(r, g, b);
+    const [x, y, z] = mul3x3(sRgbToXyzM, [lr, lg, lb]);
+    const [lR, lG, lB] = mul3x3(xyzToRec2020M, [x, y, z]);
+    return [rec2020Encode(lR), rec2020Encode(lG), rec2020Encode(lB)];
+}
+
 // Formatting
 
 function hexToRgb(hex) {
@@ -201,6 +284,14 @@ const els = {
     lmsL: document.getElementById('lms:l'),
     lmsM: document.getElementById('lms:m'),
     lmsS: document.getElementById('lms:s'),
+    p3R: document.getElementById('p3:r'),
+    p3G: document.getElementById('p3:g'),
+    p3B: document.getElementById('p3:b'),
+    rec2020R: document.getElementById('rec2020:r'),
+    rec2020G: document.getElementById('rec2020:g'),
+    rec2020B: document.getElementById('rec2020:b'),
+    p3Color: document.getElementById('p3.color'),
+    rec2020Color: document.getElementById('rec2020.color'),
 };
 
 // ---- Color plane configuration ----
@@ -241,6 +332,14 @@ const SPACES = {
         axisRanges: { C: [0, 0.4] },
         polarWheel: { rad: 'C', ang: 'H', fix: 'L', radMax: 0.4 },
         polarBar:   { var: 'L', hue: 'H', sat: 'C' },
+    },
+    p3: {
+        keys: ['r', 'g', 'b'], els: ['p3R', 'p3G', 'p3B'], precs: [valPrcs, valPrcs, valPrcs],
+        toSrgb: v => p3ToSrgb(v.r, v.g, v.b), source: 'p3:rgb', planeId: 'p3',
+    },
+    'rec2020': {
+        keys: ['r', 'g', 'b'], els: ['rec2020R', 'rec2020G', 'rec2020B'], precs: [valPrcs, valPrcs, valPrcs],
+        toSrgb: v => rec2020ToSrgb(v.r, v.g, v.b), source: 'rec2020:rgb', planeId: 'rec2020',
     },
 };
 
@@ -499,6 +598,8 @@ function updateAll(r, g, b, source) {
     const [lmsL, lmsM, lmsS] = srgbLinearToLms(linR, linG, linB);
     const [labL, labA, labB] = lmsToOklab(lmsL, lmsM, lmsS);
     const [lchL, lchC, lchH] = oklabToOklch(labL, labA, labB);
+    const [p3R, p3G, p3B] = srgbToP3(r, g, b);
+    const [r2020R, r2020G, r2020B] = srgbToRec2020(r, g, b);
 
     const tintL = lchL * 100;
     const tintC = Math.max(0, lchC);
@@ -512,6 +613,8 @@ function updateAll(r, g, b, source) {
         { els: ['oklchL','oklchC','oklchH'],                 vals: [lchL,lchC,lchH], precs: [valPrcs,valPrcs,dgrPrcs], src: 'oklch:lch'         },
         { els: ['oklabL','oklabA','oklabB'],                 vals: [labL,labA,labB], precs: [valPrcs,valPrcs,valPrcs], src: 'oklab:lab'         },
         { els: ['lmsL','lmsM','lmsS'],                       vals: [lmsL,lmsM,lmsS], precs: [valPrcs,valPrcs,valPrcs], src: 'lms:lms'           },
+        { els: ['p3R','p3G','p3B'],                           vals: [p3R,p3G,p3B], precs: [valPrcs,valPrcs,valPrcs], src: 'p3:rgb'             },
+        { els: ['rec2020R','rec2020G','rec2020B'],             vals: [r2020R,r2020G,r2020B], precs: [valPrcs,valPrcs,valPrcs], src: 'rec2020:rgb' },
     ];
 
     const FMT_OUTPUTS = [
@@ -523,6 +626,8 @@ function updateAll(r, g, b, source) {
         { el: 'hslHsl',          value: `hsl(${hslH.toFixed(dgrPrcs)}, ${hslS.toFixed(valPrcs)}, ${hslL.toFixed(valPrcs)})`,                   src: 'hsl.hsl'             },
         { el: 'oklchOklch',      value: `oklch(${lchL.toFixed(valPrcs)} ${lchC.toFixed(valPrcs)} ${lchH.toFixed(dgrPrcs)})`,                  src: 'oklch.oklch'         },
         { el: 'oklabOklab',      value: `oklab(${labL.toFixed(valPrcs)} ${labA.toFixed(valPrcs)} ${labB.toFixed(valPrcs)})`,                  src: 'oklab.oklab'         },
+        { el: 'p3Color',         value: `color(display-p3 ${p3R.toFixed(valPrcs)} ${p3G.toFixed(valPrcs)} ${p3B.toFixed(valPrcs)})`,          src: 'p3.color'            },
+        { el: 'rec2020Color',    value: `color(rec2020 ${r2020R.toFixed(valPrcs)} ${r2020G.toFixed(valPrcs)} ${r2020B.toFixed(valPrcs)})`,     src: 'rec2020.color'       },
     ];
 
     for (const g of NUM_OUTPUTS) {
@@ -625,6 +730,8 @@ const INPUT_SPACES = [
     { space: 'oklch',        keys: ['oklchL','oklchC','oklchH'],                        toSrgb: SPACES.oklch.toSrgb,            source: 'oklch:lch'        },
     { space: 'oklab',        keys: ['oklabL','oklabA','oklabB'],                        toSrgb: SPACES.oklab.toSrgb,            source: 'oklab:lab'        },
     { space: 'lms',          keys: ['lmsL','lmsM','lmsS'],                              toSrgb: SPACES.lms.toSrgb,              source: 'lms:lms'          },
+    { space: 'p3',           keys: ['p3R','p3G','p3B'],                                toSrgb: SPACES.p3.toSrgb,               source: 'p3:rgb'           },
+    { space: 'rec2020',      keys: ['rec2020R','rec2020G','rec2020B'],                   toSrgb: SPACES.rec2020.toSrgb,          source: 'rec2020:rgb'      },
 ];
 
 INPUT_SPACES.forEach(def => def.keys.forEach(k => {
