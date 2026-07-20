@@ -3,6 +3,7 @@
 
     --bg: oklab(100% 0 0);
     --bg-card: oklab(98% 0 0);
+    --bg-card-hover: oklab(98% 0 0);
     --bg-input: oklab(100% 0 0);
     --bg-desc: oklch(99% 0 0);
 
@@ -12,6 +13,7 @@
 
     --shadow: oklab(0 0 0 / 0.1);
 
+    --outline-width: 0;
     --outline-grey: oklch(0.58 0.2 280);
     --outline-red: oklch(0.58 0.1 30);
     --outline-green: oklch(0.58 0.1 150);
@@ -88,6 +90,10 @@ input {
     box-sizing: border-box;
 }
 
+.card:hover {
+    background: var(--bg-card-hover);
+}
+
 @container cards-column (width > 1000px) {
     .card {
         width: calc(50% - 10px);
@@ -115,12 +121,11 @@ input {
     background-color: var(--field-grey);
     outline-color: var(--outline-grey);
     color: var(--text-grey);
-    box-shadow: 0 4px 4px var(--shadow);
     border-radius: 8px;
     align-items: center;
     transition: outline-width 0.05s;
     outline-style: solid;
-    outline-width: 0;
+    outline-width: var(--outline-width);
     flex-grow: 1;
     margin: 8px;
 }
@@ -299,6 +304,7 @@ button.color-alert.overdrive:hover {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    transition: color 0.3s;
 }
 
 .details-toggle:hover {
@@ -319,6 +325,7 @@ button.color-alert.overdrive:hover {
     :root {
         --bg: oklab(20% 0 0);
         --bg-card: oklab(30% 0 0);
+        --bg-card-hover: oklab(32% 0 0);
         --bg-input: oklab(25% 0 0);
         --bg-desc: oklch(30% 0 0);
 
@@ -328,6 +335,7 @@ button.color-alert.overdrive:hover {
 
         --shadow: none;
 
+        --outline-width: 0.5px;
         --outline-grey: oklch(40% 0 0);
         --outline-red: oklch(40% 0.12 30);
         --outline-green: oklch(40% 0.12 150);
@@ -342,18 +350,5 @@ button.color-alert.overdrive:hover {
         --field-red: oklch(25% 0.02 30);
         --field-green: oklch(25% 0.02 150);
         --field-blue: oklch(25% 0.02 270);
-    }
-
-    .card {
-        box-shadow: 0;
-    }
-
-    .card:hover {
-        background: oklab(32% 0 0);
-    }
-
-    .color-value>div {
-        box-shadow: 0;
-        outline-width: 0.5px;
     }
 }
