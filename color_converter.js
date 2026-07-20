@@ -205,110 +205,76 @@ const els = {
 
 // ---- Color plane configuration ----
 
-const PLANES = [
-    { id: 'srgb-rg', space: 'srgb', x: 'r', y: 'g' },
-    { id: 'srgb-rb', space: 'srgb', x: 'r', y: 'b' },
-    { id: 'srgb-gb', space: 'srgb', x: 'g', y: 'b' },
-    { id: 'lin-rg', space: 'srgb-linear', x: 'R', y: 'G' },
-    { id: 'lin-rb', space: 'srgb-linear', x: 'R', y: 'B' },
-    { id: 'lin-gb', space: 'srgb-linear', x: 'G', y: 'B' },
-    { id: 'lms-lm', space: 'lms', x: 'L', y: 'M' },
-    { id: 'lms-ls', space: 'lms', x: 'L', y: 'S' },
-    { id: 'lms-ms', space: 'lms', x: 'M', y: 'S' },
-    { id: 'hsl-hl', space: 'hsl', x: 'h', y: 'l' },
-    { id: 'hsl-hs', space: 'hsl', x: 'h', y: 's' },
-    { id: 'hsl-sl', space: 'hsl', x: 's', y: 'l' },
-    { id: 'hsv-hv', space: 'hsv', x: 'h', y: 'v' },
-    { id: 'hsv-hs', space: 'hsv', x: 'h', y: 's' },
-    { id: 'hsv-sv', space: 'hsv', x: 's', y: 'v' },
-    { id: 'oklab-la', space: 'oklab', x: 'a', y: 'L', xMin: -0.4, xMax: 0.4 },
-    { id: 'oklab-lb', space: 'oklab', x: 'b', y: 'L', xMin: -0.4, xMax: 0.4 },
-    { id: 'oklab-ab', space: 'oklab', x: 'a', y: 'b', xMin: -0.4, xMax: 0.4, yMin: -0.4, yMax: 0.4 },
-    { id: 'oklch-lc', space: 'oklch', x: 'C', y: 'L', xMax: 0.4 },
-    { id: 'oklch-lh', space: 'oklch', x: 'H', y: 'L' },
-    { id: 'oklch-ch', space: 'oklch', x: 'H', y: 'C', yMax: 0.4 },
-];
-
-const POLARS = [
-    { id: 'hsl-wheel',  space: 'hsl',   type: 'wheel', rad: 's', ang: 'h', fix: 'l' },
-    { id: 'hsl-bar',    space: 'hsl',   type: 'bar',   var: 'l', hue: 'h', sat: 's' },
-    { id: 'hsv-wheel',  space: 'hsv',   type: 'wheel', rad: 's', ang: 'h', fix: 'v' },
-    { id: 'hsv-bar',    space: 'hsv',   type: 'bar',   var: 'v', hue: 'h', sat: 's' },
-    { id: 'oklch-wheel', space: 'oklch', type: 'wheel', rad: 'C', ang: 'H', fix: 'L', radMax: 0.4 },
-    { id: 'oklch-bar',  space: 'oklch', type: 'bar',   var: 'L', hue: 'H', sat: 'C' },
-];
-
-const SPACE_META = {
+const SPACES = {
     srgb: {
-        keys: ['r', 'g', 'b'],
-        els: ['srgbR', 'srgbG', 'srgbB'],
-        precs: [valPrcs, valPrcs, valPrcs],
-        toSrgb: v => [v.r, v.g, v.b],
-        source: 'srgb-float:rgb',
+        keys: ['r', 'g', 'b'], els: ['srgbR', 'srgbG', 'srgbB'], precs: [valPrcs, valPrcs, valPrcs],
+        toSrgb: v => [v.r, v.g, v.b], source: 'srgb-float:rgb', planeId: 'srgb',
     },
     'srgb-linear': {
-        keys: ['R', 'G', 'B'],
-        els: ['srgbLinearR', 'srgbLinearG', 'srgbLinearB'],
-        precs: [valPrcs, valPrcs, valPrcs],
-        toSrgb: v => srgbLinearToSensitive(v.R, v.G, v.B),
-        source: 'srgb-linear:rgb',
+        keys: ['R', 'G', 'B'], els: ['srgbLinearR', 'srgbLinearG', 'srgbLinearB'], precs: [valPrcs, valPrcs, valPrcs],
+        toSrgb: v => srgbLinearToSensitive(v.R, v.G, v.B), source: 'srgb-linear:rgb', planeId: 'lin',
     },
     lms: {
-        keys: ['L', 'M', 'S'],
-        els: ['lmsL', 'lmsM', 'lmsS'],
-        precs: [valPrcs, valPrcs, valPrcs],
-        toSrgb: v => srgbLinearToSensitive(...lmsToSrgbLinear(v.L, v.M, v.S)),
-        source: 'lms:lms',
+        keys: ['L', 'M', 'S'], els: ['lmsL', 'lmsM', 'lmsS'], precs: [valPrcs, valPrcs, valPrcs],
+        toSrgb: v => srgbLinearToSensitive(...lmsToSrgbLinear(v.L, v.M, v.S)), source: 'lms:lms', planeId: 'lms',
     },
     hsl: {
-        keys: ['h', 's', 'l'],
-        els: ['hslH', 'hslS', 'hslL'],
-        precs: [dgrPrcs, valPrcs, valPrcs],
-        fmtEl: 'hslHsl',
-        fmt: v => `hsl(${v.h.toFixed(dgrPrcs)}, ${v.s.toFixed(valPrcs)}, ${v.l.toFixed(valPrcs)})`,
-        toSrgb: v => hslToSrgb(v.h, v.s, v.l),
-        source: 'hsl:hsl',
+        keys: ['h', 's', 'l'], els: ['hslH', 'hslS', 'hslL'], precs: [dgrPrcs, valPrcs, valPrcs],
+        toSrgb: v => hslToSrgb(v.h, v.s, v.l), source: 'hsl:hsl', planeId: 'hsl', clip: true,
+        polarWheel: { rad: 's', ang: 'h', fix: 'l' },
+        polarBar:   { var: 'l', hue: 'h', sat: 's' },
     },
     hsv: {
-        keys: ['h', 's', 'v'],
-        els: ['hsvH', 'hsvS', 'hsvV'],
-        precs: [dgrPrcs, valPrcs, valPrcs],
-        toSrgb: v => hsvToSrgb(v.h, v.s, v.v),
-        source: 'hsv:hsv',
+        keys: ['h', 's', 'v'], els: ['hsvH', 'hsvS', 'hsvV'], precs: [dgrPrcs, valPrcs, valPrcs],
+        toSrgb: v => hsvToSrgb(v.h, v.s, v.v), source: 'hsv:hsv', planeId: 'hsv', clip: true,
+        polarWheel: { rad: 's', ang: 'h', fix: 'v' },
+        polarBar:   { var: 'v', hue: 'h', sat: 's' },
     },
     oklab: {
-        keys: ['L', 'a', 'b'],
-        els: ['oklabL', 'oklabA', 'oklabB'],
-        precs: [valPrcs, valPrcs, valPrcs],
-        fmtEl: 'oklabOklab',
-        fmt: v => `oklab(${v.L.toFixed(valPrcs)} ${v.a.toFixed(valPrcs)} ${v.b.toFixed(valPrcs)})`,
-        toSrgb: v => oklabToSrgb(v.L, v.a, v.b),
-        source: 'oklab:lab',
+        keys: ['L', 'a', 'b'], els: ['oklabL', 'oklabA', 'oklabB'], precs: [valPrcs, valPrcs, valPrcs],
+        toSrgb: v => oklabToSrgb(v.L, v.a, v.b), source: 'oklab:lab', planeId: 'oklab',
+        axisRanges: { a: [-0.4, 0.4], b: [-0.4, 0.4] },
     },
     oklch: {
-        keys: ['L', 'C', 'H'],
-        els: ['oklchL', 'oklchC', 'oklchH'],
-        precs: [valPrcs, valPrcs, dgrPrcs],
-        fmtEl: 'oklchOklch',
-        fmt: v => `oklch(${v.L.toFixed(valPrcs)} ${v.C.toFixed(valPrcs)} ${v.H.toFixed(dgrPrcs)})`,
-        toSrgb: v => oklchToSrgb(v.L, v.C, v.H),
-        source: 'oklch:lch',
+        keys: ['L', 'C', 'H'], els: ['oklchL', 'oklchC', 'oklchH'], precs: [valPrcs, valPrcs, dgrPrcs],
+        toSrgb: v => oklchToSrgb(v.L, v.C, v.H), source: 'oklch:lch', planeId: 'oklch',
+        axisRanges: { C: [0, 0.4] },
+        polarWheel: { rad: 'C', ang: 'H', fix: 'L', radMax: 0.4 },
+        polarBar:   { var: 'L', hue: 'H', sat: 'C' },
     },
 };
 
+const PLANES = [];
+const POLARS = [];
+
+for (const [name, s] of Object.entries(SPACES)) {
+    for (let i = 0; i < s.keys.length; i++) {
+        for (let j = i + 1; j < s.keys.length; j++) {
+            const x = s.keys[i], y = s.keys[j];
+            const cfg = { id: `${s.planeId}-${x}${y}`.toLowerCase(), space: name, x, y };
+            const rx = s.axisRanges?.[x], ry = s.axisRanges?.[y];
+            if (rx) { cfg.xMin = rx[0]; cfg.xMax = rx[1]; }
+            if (ry) { cfg.yMin = ry[0]; cfg.yMax = ry[1]; }
+            PLANES.push(cfg);
+        }
+    }
+    if (s.polarWheel) POLARS.push({ id: `${s.planeId}-wheel`, space: name, type: 'wheel', ...s.polarWheel });
+    if (s.polarBar)   POLARS.push({ id: `${s.planeId}-bar`,   space: name, type: 'bar',   ...s.polarBar });
+}
+
 function readHs(space) {
-    const m = SPACE_META[space];
+    const m = SPACES[space];
     const v = {};
     m.keys.forEach((k, i) => v[k] = parseFloat(els[m.els[i]].value) || 0);
     return v;
 }
 
 function hsToSrgb(space, v) {
-    return SPACE_META[space].toSrgb(v);
+    return SPACES[space].toSrgb(v);
 }
 
 function writeHs(space, v) {
-    const m = SPACE_META[space];
+    const m = SPACES[space];
     m.els.forEach((e, i) => els[e].value = v[m.keys[i]].toFixed(m.precs[i]));
     if (m.fmtEl) els[m.fmtEl].value = m.fmt(v);
 }
@@ -502,7 +468,7 @@ function drawAllPlanes() {
                 const vals = { ...v };
                 vals[cfg.x] = xMin + x * (xMax - xMin);
                 vals[cfg.y] = yMin + (1 - y) * (yMax - yMin);
-                return SPACE_META[cfg.space].toSrgb(vals);
+                return SPACES[cfg.space].toSrgb(vals);
             },
             (v[cfg.x] - xMin) / (xMax - xMin),
             1 - (v[cfg.y] - yMin) / (yMax - yMin)
@@ -537,109 +503,57 @@ function updateAll(r, g, b, source) {
     const tintL = lchL * 100;
     const tintC = Math.max(0, lchC);
     const tintH = ((lchH % 1) + 1) % 1 * 360;
-    document.documentElement.style.setProperty(
-        '--color-tint',
-        `oklch(${tintL.toFixed(1)}% ${tintC.toFixed(3)} ${tintH.toFixed(1)})`
-    );
 
-    if (source !== 'srgb-float:rgb') {
-        els.srgbR.value = r.toFixed(valPrcs);
-        els.srgbG.value = g.toFixed(valPrcs);
-        els.srgbB.value = b.toFixed(valPrcs);
+    const NUM_OUTPUTS = [
+        { els: ['srgbR','srgbG','srgbB'],                   vals: [r,g,b],      precs: [valPrcs,valPrcs,valPrcs],   src: 'srgb-float:rgb'      },
+        { els: ['srgbLinearR','srgbLinearG','srgbLinearB'], vals: [linR,linG,linB], precs: [valPrcs,valPrcs,valPrcs], src: 'srgb-linear:rgb'   },
+        { els: ['hslH','hslS','hslL'],                       vals: [hslH,hslS,hslL], precs: [dgrPrcs,valPrcs,valPrcs], src: 'hsl:hsl'           },
+        { els: ['hsvH','hsvS','hsvV'],                       vals: [hsvH,hsvS,hsvV], precs: [dgrPrcs,valPrcs,valPrcs], src: 'hsv:hsv'           },
+        { els: ['oklchL','oklchC','oklchH'],                 vals: [lchL,lchC,lchH], precs: [valPrcs,valPrcs,dgrPrcs], src: 'oklch:lch'         },
+        { els: ['oklabL','oklabA','oklabB'],                 vals: [labL,labA,labB], precs: [valPrcs,valPrcs,valPrcs], src: 'oklab:lab'         },
+        { els: ['lmsL','lmsM','lmsS'],                       vals: [lmsL,lmsM,lmsS], precs: [valPrcs,valPrcs,valPrcs], src: 'lms:lms'           },
+    ];
+
+    const FMT_OUTPUTS = [
+        { el: 'srgbColor',       value: `color(srgb ${r.toFixed(valPrcs)} ${g.toFixed(valPrcs)} ${b.toFixed(valPrcs)})`,                       src: 'srgb-float.color'    },
+        { el: 'srgbLinearColor', value: `color(srgb-linear ${linR.toFixed(valPrcs)} ${linG.toFixed(valPrcs)} ${linB.toFixed(valPrcs)})`,        src: 'srgb-linear.color'   },
+        { el: 'srgbLinearWgsl',  value: `vec3f(${linR.toFixed(valPrcs)}, ${linG.toFixed(valPrcs)}, ${linB.toFixed(valPrcs)})`,                  src: 'srgb-linear.wgsl'    },
+        { el: 'srgbHex',         value: '#' + [uintR, uintG, uintB].map(v => v.toString(16).padStart(2, '0')).join(''),                                                                                               src: 'srgb-uint.hex'       },
+        { el: 'srgbRgb',         value: `rgb(${uintR} ${uintG} ${uintB})`,                                                                                               src: 'srgb-uint.rgb'       },
+        { el: 'hslHsl',          value: `hsl(${hslH.toFixed(dgrPrcs)}, ${hslS.toFixed(valPrcs)}, ${hslL.toFixed(valPrcs)})`,                   src: 'hsl.hsl'             },
+        { el: 'oklchOklch',      value: `oklch(${lchL.toFixed(valPrcs)} ${lchC.toFixed(valPrcs)} ${lchH.toFixed(dgrPrcs)})`,                  src: 'oklch.oklch'         },
+        { el: 'oklabOklab',      value: `oklab(${labL.toFixed(valPrcs)} ${labA.toFixed(valPrcs)} ${labB.toFixed(valPrcs)})`,                  src: 'oklab.oklab'         },
+    ];
+
+    for (const g of NUM_OUTPUTS) {
+        if (source !== g.src) g.els.forEach((e, i) => els[e].value = g.vals[i].toFixed(g.precs[i]));
+    }
+    for (const g of FMT_OUTPUTS) {
+        if (source !== g.src) els[g.el].value = g.value;
     }
 
-    color_overdrive(r > 1 || r < 0, els.srgbUintR);
-    color_overdrive(g > 1 || g < 0, els.srgbUintG);
-    color_overdrive(b > 1 || b < 0, els.srgbUintB);
+    // sRGB alerts + special outputs
+    color_overdrive(r < 0 || r > 1, els.srgbUintR);
+    color_overdrive(g < 0 || g > 1, els.srgbUintG);
+    color_overdrive(b < 0 || b > 1, els.srgbUintB);
     if (source !== 'srgb-uint:rgb') {
         els.srgbUintR.value = Math.round(r * 255);
         els.srgbUintG.value = Math.round(g * 255);
         els.srgbUintB.value = Math.round(b * 255);
     }
 
-    color_clip(r > 1 || r < 0 || g > 1 || g < 0 || b > 1 || b < 0, els.srgbHex);
-    if (source !== 'srgb-uint.hex') {
-        els.srgbHex.value = `#\
-${uintR.toString(16).padStart(2, '0')}\
-${uintG.toString(16).padStart(2, '0')}\
-${uintB.toString(16).padStart(2, '0')}`;
-    }
+    const gamutFail = !gamutOk;
+    color_clip(gamutFail, els.srgbHex);
+    color_clip(gamutFail, els.srgbRgb);
 
-    color_clip(r > 1 || r < 0 || g > 1 || g < 0 || b > 1 || b < 0, els.srgbRgb);
-    if (source !== 'srgb-uint.rgb') {
-        els.srgbRgb.value = `rgb(${uintR} ${uintG} ${uintB})`;
-    }
-
-    if (source !== 'srgb-float.color') {
-        els.srgbColor.value = `color(srgb ${r.toFixed(valPrcs)} ${g.toFixed(valPrcs)} ${b.toFixed(valPrcs)})`;
-    }
-
-    if (source !== 'srgb-linear:rgb') {
-        els.srgbLinearR.value = linR.toFixed(valPrcs);
-        els.srgbLinearG.value = linG.toFixed(valPrcs);
-        els.srgbLinearB.value = linB.toFixed(valPrcs);
-    }
-
-    if (source !== 'srgb-linear.color') {
-        els.srgbLinearColor.value = `color(srgb-linear ${linR.toFixed(valPrcs)} ${linG.toFixed(valPrcs)} ${linB.toFixed(valPrcs)})`;
-    }
-
-    if (source !== 'srgb-linear.wgsl') {
-        els.srgbLinearWgsl.value = `vec3f(${linR.toFixed(valPrcs)}, ${linG.toFixed(valPrcs)}, ${linB.toFixed(valPrcs)})`;
-    }
-
-    color_clip(!gamutOk, els.hslH);
-    color_clip(!gamutOk, els.hslS);
-    color_clip(!gamutOk, els.hslL);
+    // HSL/HSV gamut alerts
+    color_clip(gamutFail, els.hslH); color_clip(gamutFail, els.hslS); color_clip(gamutFail, els.hslL);
     if (source !== 'hsl:hsl') {
-        els.hslH.value = hslH.toFixed(dgrPrcs);
-        els.hslS.value = hslS.toFixed(valPrcs);
-        els.hslL.value = hslL.toFixed(valPrcs);
-        color_invalid(false, els.hslH);
-        color_invalid(false, els.hslS);
-        color_invalid(false, els.hslL);
+        color_invalid(false, els.hslH); color_invalid(false, els.hslS); color_invalid(false, els.hslL);
     }
-
-    if (source !== 'hsl.hsl') {
-        els.hslHsl.value = `hsl(${hslH.toFixed(dgrPrcs)}, ${hslS.toFixed(valPrcs)}, ${hslL.toFixed(valPrcs)})`;
-    }
-
-    color_clip(!gamutOk, els.hsvH);
-    color_clip(!gamutOk, els.hsvS);
-    color_clip(!gamutOk, els.hsvV);
+    color_clip(gamutFail, els.hsvH); color_clip(gamutFail, els.hsvS); color_clip(gamutFail, els.hsvV);
     if (source !== 'hsv:hsv') {
-        els.hsvH.value = hsvH.toFixed(dgrPrcs);
-        els.hsvS.value = hsvS.toFixed(valPrcs);
-        els.hsvV.value = hsvV.toFixed(valPrcs);
-        color_invalid(false, els.hsvH);
-        color_invalid(false, els.hsvS);
-        color_invalid(false, els.hsvV);
-    }
-
-    if (source !== 'oklch:lch') {
-        els.oklchL.value = lchL.toFixed(valPrcs);
-        els.oklchC.value = lchC.toFixed(valPrcs);
-        els.oklchH.value = lchH.toFixed(dgrPrcs);
-    }
-
-    if (source !== 'oklch.oklch') {
-        els.oklchOklch.value = `oklch(${lchL.toFixed(valPrcs)} ${lchC.toFixed(valPrcs)} ${lchH.toFixed(dgrPrcs)})`;
-    }
-
-    if (source !== 'oklab:lab') {
-        els.oklabL.value = labL.toFixed(valPrcs);
-        els.oklabA.value = labA.toFixed(valPrcs);
-        els.oklabB.value = labB.toFixed(valPrcs);
-    }
-
-    if (source !== 'oklab.oklab') {
-        els.oklabOklab.value = `oklab(${labL.toFixed(valPrcs)} ${labA.toFixed(valPrcs)} ${labB.toFixed(valPrcs)})`;
-    }
-
-    if (source !== 'lms:lms') {
-        els.lmsL.value = lmsL.toFixed(valPrcs);
-        els.lmsM.value = lmsM.toFixed(valPrcs);
-        els.lmsS.value = lmsS.toFixed(valPrcs);
+        color_invalid(false, els.hsvH); color_invalid(false, els.hsvS); color_invalid(false, els.hsvV);
     }
 
     drawAllPlanes();
@@ -703,14 +617,14 @@ function color_alert_buttons(elem) {
 // ---- Input event wiring ----
 
 const INPUT_SPACES = [
-    { keys: ['srgbR', 'srgbG', 'srgbB'], toSrgb: (a, b, c) => [a, b, c], source: 'srgb-float:rgb' },
-    { keys: ['srgbUintR', 'srgbUintG', 'srgbUintB'], toSrgb: (a, b, c) => [Math.round(a) / 255, Math.round(b) / 255, Math.round(c) / 255], source: 'srgb-uint:rgb' },
-    { keys: ['srgbLinearR', 'srgbLinearG', 'srgbLinearB'], toSrgb: (a, b, c) => srgbLinearToSensitive(a, b, c), source: 'srgb-linear:rgb' },
-    { keys: ['hslH', 'hslS', 'hslL'], toSrgb: hslToSrgb, source: 'hsl:hsl', clip: true },
-    { keys: ['hsvH', 'hsvS', 'hsvV'], toSrgb: hsvToSrgb, source: 'hsv:hsv', clip: true },
-    { keys: ['oklchL', 'oklchC', 'oklchH'], toSrgb: oklchToSrgb, source: 'oklch:lch' },
-    { keys: ['oklabL', 'oklabA', 'oklabB'], toSrgb: oklabToSrgb, source: 'oklab:lab' },
-    { keys: ['lmsL', 'lmsM', 'lmsS'], toSrgb: (l, m, s) => srgbLinearToSensitive(...lmsToSrgbLinear(l, m, s)), source: 'lms:lms' },
+    { space: 'srgb',         keys: ['srgbR','srgbG','srgbB'],                          toSrgb: SPACES.srgb.toSrgb,            source: 'srgb-float:rgb'  },
+    { space: 'srgb',         keys: ['srgbUintR','srgbUintG','srgbUintB'],               toSrgb: v => [v.r / 255, v.g / 255, v.b / 255], source: 'srgb-uint:rgb'   },
+    { space: 'srgb-linear',  keys: ['srgbLinearR','srgbLinearG','srgbLinearB'],         toSrgb: SPACES['srgb-linear'].toSrgb,   source: 'srgb-linear:rgb' },
+    { space: 'hsl',          keys: ['hslH','hslS','hslL'],                              toSrgb: SPACES.hsl.toSrgb,              source: 'hsl:hsl',          clip: true },
+    { space: 'hsv',          keys: ['hsvH','hsvS','hsvV'],                              toSrgb: SPACES.hsv.toSrgb,              source: 'hsv:hsv',          clip: true },
+    { space: 'oklch',        keys: ['oklchL','oklchC','oklchH'],                        toSrgb: SPACES.oklch.toSrgb,            source: 'oklch:lch'        },
+    { space: 'oklab',        keys: ['oklabL','oklabA','oklabB'],                        toSrgb: SPACES.oklab.toSrgb,            source: 'oklab:lab'        },
+    { space: 'lms',          keys: ['lmsL','lmsM','lmsS'],                              toSrgb: SPACES.lms.toSrgb,              source: 'lms:lms'          },
 ];
 
 INPUT_SPACES.forEach(def => def.keys.forEach(k => {
@@ -735,8 +649,10 @@ els.srgbHex.addEventListener('input', () => {
 INPUT_SPACES.forEach(def => {
     def.keys.forEach(key => {
         els[key].addEventListener('input', () => {
-            const args = def.keys.map(k => parseFloat(els[k].value) || 0);
-            let [r, g, b] = def.toSrgb(...args);
+            const s = SPACES[def.space];
+            const v = {};
+            s.keys.forEach((k, i) => v[k] = parseFloat(els[def.keys[i]].value) || 0);
+            let [r, g, b] = def.toSrgb(v);
 
             if (def.clip) {
                 const cr = Math.max(0, Math.min(1, r));
@@ -800,15 +716,15 @@ function pickFromPlane(canvas, cfg, clientX, clientY) {
         v[cfg.y] = yMin + (1 - yn) * (yMax - yMin);
     }
 
-    const source = SPACE_META[cfg.space].source;
-    let [r, g, b] = SPACE_META[cfg.space].toSrgb(v);
+    const source = SPACES[cfg.space].source;
+    let [r, g, b] = SPACES[cfg.space].toSrgb(v);
 
     if (cfg.space === 'hsl' || cfg.space === 'hsv') {
         const cr = Math.max(0, Math.min(1, r));
         const cg = Math.max(0, Math.min(1, g));
         const cb = Math.max(0, Math.min(1, b));
         const outOfGamut = cr !== r || cg !== g || cb !== b;
-        SPACE_META[cfg.space].els.forEach(e => color_invalid(outOfGamut, els[e]));
+        SPACES[cfg.space].els.forEach(e => color_invalid(outOfGamut, els[e]));
         r = cr; g = cg; b = cb;
     }
 
