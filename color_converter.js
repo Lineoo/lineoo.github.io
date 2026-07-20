@@ -324,11 +324,13 @@ const SPACES = {
     oklab: {
         keys: ['L', 'a', 'b'], els: ['oklabL', 'oklabA', 'oklabB'], precs: [valPrcs, valPrcs, valPrcs],
         toSrgb: v => oklabToSrgb(v.L, v.a, v.b), source: 'oklab:lab', planeId: 'oklab',
+        planes: [{ id: 'oklab-la', x: 'a', y: 'L' }, { id: 'oklab-lb', x: 'b', y: 'L' }, { id: 'oklab-ab', x: 'a', y: 'b' }],
         axisRanges: { a: [-0.4, 0.4], b: [-0.4, 0.4] },
     },
     oklch: {
         keys: ['L', 'C', 'H'], els: ['oklchL', 'oklchC', 'oklchH'], precs: [valPrcs, valPrcs, dgrPrcs],
         toSrgb: v => oklchToSrgb(v.L, v.C, v.H), source: 'oklch:lch', planeId: 'oklch',
+        planes: [{ id: 'oklch-lc', x: 'C', y: 'L' }, { id: 'oklch-lh', x: 'H', y: 'L' }, { id: 'oklch-ch', x: 'H', y: 'C' }],
         axisRanges: { C: [0, 0.4] },
         polarWheel: { rad: 'C', ang: 'H', fix: 'L', radMax: 0.4 },
         polarBar:   { var: 'L', hue: 'H', sat: 'C' },
@@ -347,15 +349,19 @@ const PLANES = [];
 const POLARS = [];
 
 for (const [name, s] of Object.entries(SPACES)) {
-    for (let i = 0; i < s.keys.length; i++) {
-        for (let j = i + 1; j < s.keys.length; j++) {
-            const x = s.keys[i], y = s.keys[j];
-            const cfg = { id: `${s.planeId}-${x}${y}`.toLowerCase(), space: name, x, y };
-            const rx = s.axisRanges?.[x], ry = s.axisRanges?.[y];
-            if (rx) { cfg.xMin = rx[0]; cfg.xMax = rx[1]; }
-            if (ry) { cfg.yMin = ry[0]; cfg.yMax = ry[1]; }
-            PLANES.push(cfg);
-        }
+    const pairs = s.planes || (() => {
+        const p = [];
+        for (let i = 0; i < s.keys.length; i++)
+            for (let j = i + 1; j < s.keys.length; j++)
+                p.push({ x: s.keys[i], y: s.keys[j] });
+        return p;
+    })();
+    for (const p of pairs) {
+        const cfg = { id: p.id || `${s.planeId}-${p.x}${p.y}`.toLowerCase(), space: name, x: p.x, y: p.y };
+        const rx = s.axisRanges?.[p.x], ry = s.axisRanges?.[p.y];
+        if (rx) { cfg.xMin = rx[0]; cfg.xMax = rx[1]; }
+        if (ry) { cfg.yMin = ry[0]; cfg.yMax = ry[1]; }
+        PLANES.push(cfg);
     }
     if (s.polarWheel) POLARS.push({ id: `${s.planeId}-wheel`, space: name, type: 'wheel', ...s.polarWheel });
     if (s.polarBar)   POLARS.push({ id: `${s.planeId}-bar`,   space: name, type: 'bar',   ...s.polarBar });
