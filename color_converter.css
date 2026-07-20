@@ -35,6 +35,8 @@
     --alert-clip-hover: oklch(85% 0.1 20);
     --alert-overdrive: oklch(90% 0.1 60);
     --alert-overdrive-hover: oklch(85% 0.1 60);
+    --alert-invalid: oklch(90% 0.08 300);
+    --alert-invalid-hover: oklch(85% 0.08 300);
 }
 
 body {
@@ -231,6 +233,14 @@ button.color-alert.overdrive {
 
 button.color-alert.overdrive:hover {
     background-color: var(--alert-overdrive-hover);
+}
+
+button.color-alert.invalid {
+    background-color: var(--alert-invalid);
+}
+
+button.color-alert.invalid:hover {
+    background-color: var(--alert-invalid-hover);
 }
 
 .color-planes {

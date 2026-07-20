@@ -222,36 +222,36 @@ const PLANES = [
 
 const SPACE_META = {
     hsl: {
-        keys:   ['h','s','l'],
-        els:    ['hslH','hslS','hslL'],
-        precs:  [dgrPrcs, valPrcs, valPrcs],
-        fmtEl:  'hslHsl',
-        fmt:    v => `hsl(${v.h.toFixed(dgrPrcs)}, ${v.s.toFixed(valPrcs)}, ${v.l.toFixed(valPrcs)})`,
+        keys: ['h', 's', 'l'],
+        els: ['hslH', 'hslS', 'hslL'],
+        precs: [dgrPrcs, valPrcs, valPrcs],
+        fmtEl: 'hslHsl',
+        fmt: v => `hsl(${v.h.toFixed(dgrPrcs)}, ${v.s.toFixed(valPrcs)}, ${v.l.toFixed(valPrcs)})`,
         toSrgb: v => hslToSrgb(v.h, v.s, v.l),
         source: 'hsl:hsl',
     },
     hsv: {
-        keys:   ['h','s','v'],
-        els:    ['hsvH','hsvS','hsvV'],
-        precs:  [dgrPrcs, valPrcs, valPrcs],
+        keys: ['h', 's', 'v'],
+        els: ['hsvH', 'hsvS', 'hsvV'],
+        precs: [dgrPrcs, valPrcs, valPrcs],
         toSrgb: v => hsvToSrgb(v.h, v.s, v.v),
         source: 'hsv:hsv',
     },
     oklab: {
-        keys:   ['L','a','b'],
-        els:    ['oklabL','oklabA','oklabB'],
-        precs:  [valPrcs, valPrcs, valPrcs],
-        fmtEl:  'oklabOklab',
-        fmt:    v => `oklab(${v.L.toFixed(valPrcs)} ${v.a.toFixed(valPrcs)} ${v.b.toFixed(valPrcs)})`,
+        keys: ['L', 'a', 'b'],
+        els: ['oklabL', 'oklabA', 'oklabB'],
+        precs: [valPrcs, valPrcs, valPrcs],
+        fmtEl: 'oklabOklab',
+        fmt: v => `oklab(${v.L.toFixed(valPrcs)} ${v.a.toFixed(valPrcs)} ${v.b.toFixed(valPrcs)})`,
         toSrgb: v => oklabToSrgb(v.L, v.a, v.b),
         source: 'oklab:lab',
     },
     oklch: {
-        keys:   ['L','C','H'],
-        els:    ['oklchL','oklchC','oklchH'],
-        precs:  [valPrcs, valPrcs, dgrPrcs],
-        fmtEl:  'oklchOklch',
-        fmt:    v => `oklch(${v.L.toFixed(valPrcs)} ${v.C.toFixed(valPrcs)} ${v.H.toFixed(dgrPrcs)})`,
+        keys: ['L', 'C', 'H'],
+        els: ['oklchL', 'oklchC', 'oklchH'],
+        precs: [valPrcs, valPrcs, dgrPrcs],
+        fmtEl: 'oklchOklch',
+        fmt: v => `oklch(${v.L.toFixed(valPrcs)} ${v.C.toFixed(valPrcs)} ${v.H.toFixed(dgrPrcs)})`,
         toSrgb: v => oklchToSrgb(v.L, v.C, v.H),
         source: 'oklch:lch',
     },
@@ -342,7 +342,7 @@ function drawAllPlanes() {
                 const vals = { ...v };
                 vals[cfg.x] = xMin + x * (xMax - xMin);
                 vals[cfg.y] = yMin + (1 - y) * (yMax - yMin);
-                return hsToSrgb(cfg.space, vals);
+                return SPACE_META[cfg.space].toSrgb(vals);
             },
             (v[cfg.x] - xMin) / (xMax - xMin),
             1 - (v[cfg.y] - yMin) / (yMax - yMin)
@@ -421,26 +421,32 @@ ${uintB.toString(16).padStart(2, '0')}`;
         els.srgbLinearWgsl.value = `vec3f(${linR.toFixed(valPrcs)}, ${linG.toFixed(valPrcs)}, ${linB.toFixed(valPrcs)})`;
     }
 
+    color_clip(!gamutOk, els.hslH);
+    color_clip(!gamutOk, els.hslS);
+    color_clip(!gamutOk, els.hslL);
     if (source !== 'hsl:hsl') {
         els.hslH.value = hslH.toFixed(dgrPrcs);
         els.hslS.value = hslS.toFixed(valPrcs);
         els.hslL.value = hslL.toFixed(valPrcs);
-        color_clip(!gamutOk, els.hslH);
-        color_clip(!gamutOk, els.hslS);
-        color_clip(!gamutOk, els.hslL);
+        color_invalid(false, els.hslH);
+        color_invalid(false, els.hslS);
+        color_invalid(false, els.hslL);
     }
 
     if (source !== 'hsl.hsl') {
         els.hslHsl.value = `hsl(${hslH.toFixed(dgrPrcs)}, ${hslS.toFixed(valPrcs)}, ${hslL.toFixed(valPrcs)})`;
     }
 
+    color_clip(!gamutOk, els.hsvH);
+    color_clip(!gamutOk, els.hsvS);
+    color_clip(!gamutOk, els.hsvV);
     if (source !== 'hsv:hsv') {
         els.hsvH.value = hsvH.toFixed(dgrPrcs);
         els.hsvS.value = hsvS.toFixed(valPrcs);
         els.hsvV.value = hsvV.toFixed(valPrcs);
-        color_clip(!gamutOk, els.hsvH);
-        color_clip(!gamutOk, els.hsvS);
-        color_clip(!gamutOk, els.hsvV);
+        color_invalid(false, els.hsvH);
+        color_invalid(false, els.hsvS);
+        color_invalid(false, els.hsvV);
     }
 
     if (source !== 'oklch:lch') {
@@ -504,6 +510,21 @@ function color_overdrive(enable, elem) {
     }
 }
 
+function color_invalid(enable, elem) {
+    if (!elem.color_invalid && enable) {
+        color_alert_buttons(elem);
+        let button = document.createElement("button");
+        button.className = "color-alert invalid";
+        button.title = "颜色数值不合法（产生色彩空间冲突）";
+
+        elem.color_invalid = button;
+        elem.alert_buttons.appendChild(button);
+    } else if (elem.color_invalid && !enable) {
+        elem.alert_buttons.removeChild(elem.color_invalid);
+        elem.color_invalid = undefined;
+    }
+}
+
 function color_alert_buttons(elem) {
     if (!elem.alert_buttons) {
         let div = document.createElement("div");
@@ -515,14 +536,14 @@ function color_alert_buttons(elem) {
 // ---- Input event wiring ----
 
 const INPUT_SPACES = [
-    { keys: ['srgbR','srgbG','srgbB'],                    toSrgb: (a,b,c) => [a,b,c],                              source: 'srgb-float:rgb'   },
-    { keys: ['srgbUintR','srgbUintG','srgbUintB'],        toSrgb: (a,b,c) => [Math.round(a)/255, Math.round(b)/255, Math.round(c)/255], source: 'srgb-uint:rgb' },
-    { keys: ['srgbLinearR','srgbLinearG','srgbLinearB'],  toSrgb: (a,b,c) => srgbLinearToSensitive(a,b,c),         source: 'srgb-linear:rgb'  },
-    { keys: ['hslH','hslS','hslL'],                       toSrgb: hslToSrgb,                                       source: 'hsl:hsl',          clip: true },
-    { keys: ['hsvH','hsvS','hsvV'],                       toSrgb: hsvToSrgb,                                       source: 'hsv:hsv',          clip: true },
-    { keys: ['oklchL','oklchC','oklchH'],                 toSrgb: oklchToSrgb,                                     source: 'oklch:lch'        },
-    { keys: ['oklabL','oklabA','oklabB'],                 toSrgb: oklabToSrgb,                                     source: 'oklab:lab'        },
-    { keys: ['lmsL','lmsM','lmsS'],                       toSrgb: (l,m,s) => srgbLinearToSensitive(...lmsToSrgbLinear(l,m,s)), source: 'lms:lms' },
+    { keys: ['srgbR', 'srgbG', 'srgbB'], toSrgb: (a, b, c) => [a, b, c], source: 'srgb-float:rgb' },
+    { keys: ['srgbUintR', 'srgbUintG', 'srgbUintB'], toSrgb: (a, b, c) => [Math.round(a) / 255, Math.round(b) / 255, Math.round(c) / 255], source: 'srgb-uint:rgb' },
+    { keys: ['srgbLinearR', 'srgbLinearG', 'srgbLinearB'], toSrgb: (a, b, c) => srgbLinearToSensitive(a, b, c), source: 'srgb-linear:rgb' },
+    { keys: ['hslH', 'hslS', 'hslL'], toSrgb: hslToSrgb, source: 'hsl:hsl', clip: true },
+    { keys: ['hsvH', 'hsvS', 'hsvV'], toSrgb: hsvToSrgb, source: 'hsv:hsv', clip: true },
+    { keys: ['oklchL', 'oklchC', 'oklchH'], toSrgb: oklchToSrgb, source: 'oklch:lch' },
+    { keys: ['oklabL', 'oklabA', 'oklabB'], toSrgb: oklabToSrgb, source: 'oklab:lab' },
+    { keys: ['lmsL', 'lmsM', 'lmsS'], toSrgb: (l, m, s) => srgbLinearToSensitive(...lmsToSrgbLinear(l, m, s)), source: 'lms:lms' },
 ];
 
 INPUT_SPACES.forEach(def => {
@@ -536,7 +557,7 @@ INPUT_SPACES.forEach(def => {
                 const cg = Math.max(0, Math.min(1, g));
                 const cb = Math.max(0, Math.min(1, b));
                 const outOfGamut = cr !== r || cg !== g || cb !== b;
-                def.keys.forEach(k => color_clip(outOfGamut, els[k]));
+                def.keys.forEach(k => color_invalid(outOfGamut, els[k]));
                 r = cr; g = cg; b = cb;
             }
 
@@ -585,18 +606,7 @@ function pickFromPlane(canvas, cfg, clientX, clientY) {
     v[cfg.y] = yMin + (1 - yn) * (yMax - yMin);
 
     const source = SPACE_META[cfg.space].source;
-
-    let [r, g, b] = hsToSrgb(cfg.space, v);
-
-    if (cfg.space === 'hsl' || cfg.space === 'hsv') {
-        const cr = Math.max(0, Math.min(1, r));
-        const cg = Math.max(0, Math.min(1, g));
-        const cb = Math.max(0, Math.min(1, b));
-        const outOfGamut = cr !== r || cg !== g || cb !== b;
-        const m = SPACE_META[cfg.space];
-        m.els.forEach(e => color_clip(outOfGamut, els[e]));
-        r = cr; g = cg; b = cb;
-    }
+    const [r, g, b] = SPACE_META[cfg.space].toSrgb(v);
 
     writeHs(cfg.space, v);
     updateAll(r, g, b, source);
@@ -645,7 +655,8 @@ function moveLabelDrag(e, clientX) {
     if (isUint) {
         val = Math.round(Math.max(0, Math.min(255, val)));
     } else {
-        val = Math.max(0, val);
+        const prec = e.shiftKey ? 10000 : 1000;
+        val = Math.round(val * prec) / prec;
     }
     dragLabelInput.value = val;
     dragLabelInput.dispatchEvent(new Event('input', { bubbles: true }));
