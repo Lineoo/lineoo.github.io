@@ -174,9 +174,6 @@ const sRgbToXyzM = [
 ];
 const xyzToSRgbM = inv3x3(sRgbToXyzM);
 
-function srgbToXyz(r, g, b) { return mul3x3(sRgbToXyzM, [r, g, b]); }
-function xyzToSrgb(x, y, z)  { return mul3x3(xyzToSRgbM, [x, y, z]);  }
-
 // Display P3 <-> sRGB
 
 const p3ToXyzM = [
@@ -330,7 +327,7 @@ const SPACES = {
     oklch: {
         keys: ['L', 'C', 'H'], els: ['oklchL', 'oklchC', 'oklchH'], precs: [valPrcs, valPrcs, dgrPrcs],
         toSrgb: v => oklchToSrgb(v.L, v.C, v.H), source: 'oklch:lch', planeId: 'oklch',
-        planes: [{ id: 'oklch-lc', x: 'C', y: 'L' }, { id: 'oklch-lh', x: 'H', y: 'L' }, { id: 'oklch-ch', x: 'H', y: 'C' }],
+        planes: [{ id: 'oklch-lc', x: 'L', y: 'C' }, { id: 'oklch-lh', x: 'H', y: 'L' }, { id: 'oklch-ch', x: 'H', y: 'C' }],
         axisRanges: { C: [0, 0.4] },
         polarWheel: { rad: 'C', ang: 'H', fix: 'L', radMax: 0.4 },
         polarBar:   { var: 'L', hue: 'H', sat: 'C' },
@@ -374,14 +371,9 @@ function readHs(space) {
     return v;
 }
 
-function hsToSrgb(space, v) {
-    return SPACES[space].toSrgb(v);
-}
-
 function writeHs(space, v) {
     const m = SPACES[space];
     m.els.forEach((e, i) => els[e].value = v[m.keys[i]].toFixed(m.precs[i]));
-    if (m.fmtEl) els[m.fmtEl].value = m.fmt(v);
 }
 
 // ---- Plane drawing ----
@@ -389,16 +381,16 @@ function writeHs(space, v) {
 function drawColorPlane(canvas, colorFn, mx, my) {
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    if (rect.width < 10 || rect.height < 10) return;
     const dpr = window.devicePixelRatio || 1;
-
-    const w = Math.floor(rect.width * dpr);
-    const h = Math.floor(rect.height * dpr);
+    const w = Math.floor(rect.width * dpr), h = Math.floor(rect.height * dpr);
+    if (rect.width < 10 || rect.height < 10) return;
     canvas.width = w;
     canvas.height = h;
 
     const ctx = canvas.getContext('2d');
-    const imageData = ctx.createImageData(w, h);
+    if (!canvas._buf || canvas._buf.w !== w || canvas._buf.h !== h)
+        canvas._buf = { w, h, data: ctx.createImageData(w, h) };
+    const imageData = canvas._buf.data;
 
     for (let py = 0; py < h; py++) {
         for (let px = 0; px < w; px++) {
@@ -421,35 +413,29 @@ function drawColorPlane(canvas, colorFn, mx, my) {
 
     ctx.putImageData(imageData, 0, 0);
 
-    const cx = mx * w;
-    const cy = my * h;
+    const cx = Math.round(mx * w);
+    const cy = Math.round(my * h);
 
-    ctx.beginPath();
-    ctx.arc(cx, cy, 7.5, 0, Math.PI * 2);
-    ctx.strokeStyle = 'oklch(0% 0 0)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-    ctx.strokeStyle = 'oklch(100% 0 0)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    ctx.strokeStyle = 'oklch(50% 0 0 / 0.7)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.stroke();
 }
 
-function drawWheel(canvas, space, radKey, angKey, fixKey, radMax) {
+function drawWheel(canvas, space, radKey, angKey, radMax) {
     if (!canvas) return;
     radMax = radMax || 1;
     const rect = canvas.getBoundingClientRect();
-    if (rect.width < 10 || rect.height < 10) return;
     const dpr = window.devicePixelRatio || 1;
-
-    const w = Math.floor(rect.width * dpr);
-    const h = Math.floor(rect.height * dpr);
+    const w = Math.floor(rect.width * dpr), h = Math.floor(rect.height * dpr);
+    if (rect.width < 10 || rect.height < 10) return;
     canvas.width = w;
     canvas.height = h;
 
     const ctx = canvas.getContext('2d');
-    const imageData = ctx.createImageData(w, h);
+    if (!canvas._buf || canvas._buf.w !== w || canvas._buf.h !== h)
+        canvas._buf = { w, h, data: ctx.createImageData(w, h) };
+    const imageData = canvas._buf.data;
     const cx = w / 2, cy = h / 2, maxR = Math.min(w, h) / 2;
     const v = readHs(space);
 
@@ -465,7 +451,7 @@ function drawWheel(canvas, space, radKey, angKey, fixKey, radMax) {
             vals[radKey] = (r / maxR) * radMax;
             vals[angKey] = angle / (Math.PI * 2);
 
-            const [cr, cg, cb] = hsToSrgb(space, vals);
+            const [cr, cg, cb] = SPACES[space].toSrgb(vals);
             const inGamut = cr >= 0 && cr <= 1 && cg >= 0 && cg <= 1 && cb >= 0 && cb <= 1;
             if (inGamut) {
                 imageData.data[idx] = Math.round(cr * 255);
@@ -483,41 +469,35 @@ function drawWheel(canvas, space, radKey, angKey, fixKey, radMax) {
     ctx.putImageData(imageData, 0, 0);
 
     const rad = (v[radKey] || 0) / radMax, ang = (v[angKey] || 0) * Math.PI * 2;
-    const mx = cx + rad * maxR * Math.cos(ang);
-    const my = cy - rad * maxR * Math.sin(ang);
+    const mx = Math.round(cx + rad * maxR * Math.cos(ang));
+    const my = Math.round(cy - rad * maxR * Math.sin(ang));
 
-    ctx.beginPath();
-    ctx.arc(mx, my, 7.5, 0, Math.PI * 2);
-    ctx.strokeStyle = 'oklch(0% 0 0)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(mx, my, 6, 0, Math.PI * 2);
-    ctx.strokeStyle = 'oklch(100% 0 0)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    ctx.strokeStyle = 'oklch(50% 0 0 / 0.7)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(mx, 0); ctx.lineTo(mx, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(w, my); ctx.stroke();
 }
 
-function drawBar(canvas, space, varKey, hueKey, satKey) {
+function drawBar(canvas, space, varKey) {
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    if (rect.width < 10 || rect.height < 10) return;
     const dpr = window.devicePixelRatio || 1;
-
-    const w = Math.floor(rect.width * dpr);
-    const h = Math.floor(rect.height * dpr);
+    const w = Math.floor(rect.width * dpr), h = Math.floor(rect.height * dpr);
+    if (rect.width < 10 || rect.height < 10) return;
     canvas.width = w;
     canvas.height = h;
 
     const ctx = canvas.getContext('2d');
-    const imageData = ctx.createImageData(w, h);
+    if (!canvas._buf || canvas._buf.w !== w || canvas._buf.h !== h)
+        canvas._buf = { w, h, data: ctx.createImageData(w, h) };
+    const imageData = canvas._buf.data;
     const v = readHs(space);
 
     for (let py = 0; py < h; py++) {
         for (let px = 0; px < w; px++) {
             const vals = { ...v };
             vals[varKey] = 1 - py / h;
-            const [cr, cg, cb] = hsToSrgb(space, vals);
+            const [cr, cg, cb] = SPACES[space].toSrgb(vals);
             const idx = (py * w + px) * 4;
             const inGamut = cr >= 0 && cr <= 1 && cg >= 0 && cg <= 1 && cb >= 0 && cb <= 1;
             if (inGamut) {
@@ -536,29 +516,33 @@ function drawBar(canvas, space, varKey, hueKey, satKey) {
     ctx.putImageData(imageData, 0, 0);
 
     const val = v[varKey] || 0;
-    const y = (1 - val) * h;
+    const y = Math.round((1 - val) * h);
 
-    ctx.beginPath();
-    ctx.arc(w / 2, y, 7.5, 0, Math.PI * 2);
-    ctx.strokeStyle = 'oklch(0% 0 0)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(w / 2, y, 6, 0, Math.PI * 2);
-    ctx.strokeStyle = 'oklch(100% 0 0)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    ctx.strokeStyle = 'oklch(50% 0 0 / 0.7)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
 }
 
-const drawTimeLimit = 100;
+const drawTimeLimit = 50;
 
 let lastDrawTime = 0;
+let drawDebounce = null;
 
 function drawAllPlanes() {
     const now = Date.now();
-    if (now - lastDrawTime < drawTimeLimit) return;
-    lastDrawTime = now;
+    if (now - lastDrawTime >= drawTimeLimit) {
+        lastDrawTime = now;
+        clearTimeout(drawDebounce);
+        drawPlanesNow();
+    }
+    clearTimeout(drawDebounce);
+    drawDebounce = setTimeout(() => {
+        lastDrawTime = 0;
+        drawPlanesNow();
+    }, drawTimeLimit);
+}
 
+function drawPlanesNow() {
     for (const cfg of PLANES) {
         const canvas = document.getElementById(cfg.id);
         if (!canvas || canvas.parentElement.classList.contains('collapsed')) continue;
@@ -583,8 +567,8 @@ function drawAllPlanes() {
     for (const p of POLARS) {
         const canvas = document.getElementById(p.id);
         if (!canvas || canvas.parentElement.classList.contains('collapsed')) continue;
-        if (p.type === 'wheel') drawWheel(canvas, p.space, p.rad, p.ang, p.fix, p.radMax);
-        else drawBar(canvas, p.space, p.var, p.hue, p.sat);
+        if (p.type === 'wheel') drawWheel(canvas, p.space, p.rad, p.ang, p.radMax);
+        else drawBar(canvas, p.space, p.var);
     }
 }
 
@@ -606,10 +590,6 @@ function updateAll(r, g, b, source) {
     const [lchL, lchC, lchH] = oklabToOklch(labL, labA, labB);
     const [p3R, p3G, p3B] = srgbToP3(r, g, b);
     const [r2020R, r2020G, r2020B] = srgbToRec2020(r, g, b);
-
-    const tintL = lchL * 100;
-    const tintC = Math.max(0, lchC);
-    const tintH = ((lchH % 1) + 1) % 1 * 360;
 
     const NUM_OUTPUTS = [
         { els: ['srgbR','srgbG','srgbB'],                   vals: [r,g,b],      precs: [valPrcs,valPrcs,valPrcs],   src: 'srgb-float:rgb'      },
@@ -932,6 +912,6 @@ document.addEventListener('touchend', stopAllDrag);
 
 document.addEventListener('transitionend', function (e) {
     if (e.target.classList.contains('color-planes') && !e.target.classList.contains('collapsed')) {
-        drawAllPlanes();
+        drawPlanesNow();
     }
 });

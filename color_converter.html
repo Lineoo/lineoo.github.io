@@ -11,8 +11,7 @@
 <body>
   <div class="content">
     <div class="header">
-      <h1 class="title">颜色转换器</h1>
-      <p class="subtitle">各种色彩空间互转</p>
+      <h1 class="title">色彩空间转换</h1>
     </div>
 
     <div class="cards-row">
@@ -24,9 +23,9 @@
             sRGB <span class="toggle-icon" aria-hidden="true">▸</span>
           </button>
           <div class="card-description collapsed" id="desc-srgb">
-            <a>sRGB 是目前最通用的标准 RGB 色彩空间，由惠普与微软于 1996 年联合制定，广泛用于显示器、互联网图像和消费级数码设备。它定义了红、绿、蓝三原色和白点（D65），并采用近似伽马值 2.2
+            <p>sRGB 是目前最通用的标准 RGB 色彩空间，由惠普与微软于 1996 年联合制定，广泛用于显示器、互联网图像和消费级数码设备。它定义了红、绿、蓝三原色和白点（D65），并采用近似伽马值 2.2
               的非线性传递函数（实际上是一段线性加一段幂函数）。这种非线性编码源于早期 CRT 显示器的电光特性，并恰好能高效利用 8 比特的存储精度，在人眼最敏感的暗部分配更多码值。网页上未声明色彩空间的图片，通常默认按照
-              sRGB 解释。</a>
+              sRGB 解释。</p>
           </div>
           <div class="color-value">
             <div class="red"><label>R</label><input id="srgb-float:r"></div>
@@ -60,9 +59,9 @@
             Linear <span class="toggle-icon" aria-hidden="true">▸</span>
           </button>
           <div class="card-description collapsed" id="desc-srgb-linear">
-            <a>sRGB-Linear（线性 sRGB）即去除了 sRGB 伽马校正后的空间，其中的 RGB 数值与物理光强度呈线性关系。若直接将 sRGB
+            <p>sRGB-Linear（线性 sRGB）即去除了 sRGB 伽马校正后的空间，其中的 RGB 数值与物理光强度呈线性关系。若直接将 sRGB
               图像进行模糊、缩放或混合，会得到物理上错误的发光效果（如暗部发黑、边缘出现深色条纹），因此任何需要模拟真实光照的计算（如 3D 渲染合成、模糊、抗锯齿）都应先将 sRGB 转换为
-              sRGB-Linear，处理完后再转换回 sRGB 进行显示。</a>
+              sRGB-Linear，处理完后再转换回 sRGB 进行显示。</p>
           </div>
           <div class="color-value">
             <div class="red"><label>R</label><input id="srgb-linear:r"></div>
@@ -91,9 +90,9 @@
             P3 <span class="toggle-icon" aria-hidden="true">▸</span>
           </button>
           <div class="card-description collapsed" id="desc-p3">
-            <a>Display P3 是由 Apple 推广的广色域 RGB 色彩空间，采用 DCI-P3 主色配合 D65 白点。相较于 sRGB，P3 色域大约宽
+            <p>Display P3 是由 Apple 推广的广色域 RGB 色彩空间，采用 DCI-P3 主色配合 D65 白点。相较于 sRGB，P3 色域大约宽
               25%，可呈现更加鲜艳的红色和绿色。该色彩空间广泛应用于现代 iPhone、Mac 及 HDR 显示器中。其传递函数与 sRGB 完全一致，均使用约 2.2
-              的伽马值，因此兼容性较好。网页中使用 <code>color(display-p3 r g b)</code> 语法进行颜色表示。</a>
+              的伽马值，因此兼容性较好。网页中使用 <code>color(display-p3 r g b)</code> 语法进行颜色表示。</p>
           </div>
           <div class="color-value">
             <div class="red"><label>R</label><input id="p3:r"></div>
@@ -119,10 +118,10 @@
             Rec.2020 <span class="toggle-icon" aria-hidden="true">▸</span>
           </button>
           <div class="card-description collapsed" id="desc-rec2020">
-            <a>BT.2020 是 ITU-R 为 4K/8K UHDTV 制定的色彩空间标准，主色采用单色波长（630nm 红、532nm 绿、467nm
+            <p>BT.2020 是 ITU-R 为 4K/8K UHDTV 制定的色彩空间标准，主色采用单色波长（630nm 红、532nm 绿、467nm
               蓝），是目前消费级最宽的 RGB 色彩空间。其传递函数不同于 sRGB，使用了 α=1.0993,
               β=0.0181 的编码参数，线性段斜率高达 4.5 倍。该色彩空间覆盖了人眼可感知的大部分色域，通常只在高端的专业参考显示器中才能完全呈现。网页中使用
-              <code>color(rec2020 r g b)</code> 语法进行颜色表示。</a>
+              <code>color(rec2020 r g b)</code> 语法进行颜色表示。</p>
           </div>
           <div class="color-value">
             <div class="red"><label>R</label><input id="rec2020:r"></div>
@@ -151,8 +150,8 @@
             OKLab <span class="toggle-icon" aria-hidden="true">▸</span>
           </button>
           <div class="card-description collapsed" id="desc-oklab">
-            <a>OKLab 是 2020 年由 Björn Ottosson 提出的一种感知均匀色彩空间。它由明度 L 和两个色度分量 a、b 构成，旨在解决经典 CIELAB 空间在蓝色区域出现明显色调偏移的问题。OKLab
-              能较好地保持色相的感知恒定，且在数字图像处理（如生成平滑渐变、调整饱和度、色调映射）时更加自然。它的转换仅涉及矩阵运算和立方根，计算简单高效，正逐渐被各类新式图像工具和色彩库采纳。</a>
+            <p>OKLab 是 2020 年由 Björn Ottosson 提出的一种感知均匀色彩空间。它由明度 L 和两个色度分量 a、b 构成，旨在解决经典 CIELAB 空间在蓝色区域出现明显色调偏移的问题。OKLab
+              能较好地保持色相的感知恒定，且在数字图像处理（如生成平滑渐变、调整饱和度、色调映射）时更加自然。它的转换仅涉及矩阵运算和立方根，计算简单高效，正逐渐被各类新式图像工具和色彩库采纳。</p>
           </div>
           <div class="color-value">
             <div><label>L</label><input id="oklab:l"></div>
@@ -178,9 +177,9 @@
             OKLCH <span class="toggle-icon" aria-hidden="true">▸</span>
           </button>
           <div class="card-description collapsed" id="desc-oklch">
-            <a>OKLch 是 OKLab 空间的极坐标形式，与 Lch 色彩模型类似：L 依然表示明度，C 为彩度（Chroma，即颜色的鲜艳程度），h
+            <p>OKLch 是 OKLab 空间的极坐标形式，与 Lch 色彩模型类似：L 依然表示明度，C 为彩度（Chroma，即颜色的鲜艳程度），h
               为色相角度（Hue）。因为坐标直接对应人类对颜色的直觉 ——"这是什么颜色？多鲜艳？多亮？"——OKLch 在调色板生成、设计工具以及 Web 开发中非常友好。例如 CSS Color Level 4 已原生支持
-              oklch() 函数，方便设计师创建感知均匀的渐变和色彩系统。</a>
+              oklch() 函数，方便设计师创建感知均匀的渐变和色彩系统。</p>
           </div>
           <div class="color-value">
             <div><label>L</label><input id="oklch:l"></div>
@@ -213,10 +212,10 @@
             HSL <span class="toggle-icon" aria-hidden="true">▸</span>
           </button>
           <div class="card-description collapsed" id="desc-hsl">
-            <a>HSL 是一种将颜色用<b>色相（Hue）</b>、<b>饱和度（Saturation）</b> 和<b>亮度（Lightness）</b> 三个分量描述的色彩模型。色相以 0°–360°
+            <p>HSL 是一种将颜色用<b>色相（Hue）</b>、<b>饱和度（Saturation）</b> 和<b>亮度（Lightness）</b> 三个分量描述的色彩模型。色相以 0°–360°
               角度表示颜色种类（红、绿、蓝等）；饱和度表示色彩纯度（0% 为灰色，100% 为纯色）；亮度表示颜色明暗程度（0% 为黑色，100% 为白色）。在 HSL 圆柱模型中，纯色（如饱和度 100%）在亮度 50%
               时最鲜艳，向上增亮逐渐变白，向下减暗逐渐变黑。HSL 被广泛应用于 CSS 颜色表示（如 <code>hsl(120, 100%, 50%)</code>
-              为纯绿色）和图形软件中的拾色器，优点是调整亮度时同时控制阴影和高光，符合人类对颜色深浅的直观理解。</a>
+              为纯绿色）和图形软件中的拾色器，优点是调整亮度时同时控制阴影和高光，符合人类对颜色深浅的直观理解。</p>
           </div>
           <div class="color-value">
             <div><label>H</label><input id="hsl:h"></div>
@@ -249,10 +248,10 @@
             HSV <span class="toggle-icon" aria-hidden="true">▸</span>
           </button>
           <div class="card-description collapsed" id="desc-hsv">
-            <a>HSV 使用<b>色相（Hue）</b>、<b>饱和度（Saturation）</b> 和<b>明度（Value）</b> 三个分量来描述颜色。色相同样以 0°–360° 表示颜色种类；饱和度表示颜色纯度（0%
+            <p>HSV 使用<b>色相（Hue）</b>、<b>饱和度（Saturation）</b> 和<b>明度（Value）</b> 三个分量来描述颜色。色相同样以 0°–360° 表示颜色种类；饱和度表示颜色纯度（0%
               为灰色，100% 为纯色）；明度表示颜色的明亮程度（0% 为黑色，100% 为最亮）。在 HSV 圆锥模型中，纯色（饱和度 100%）位于明度 100%
               的底面圆周上，明度降低时颜色逐渐向黑色过渡，但不会变为白色（白色需通过饱和度 0% 且明度 100% 实现）。HSV 常被称为 HSB（Adobe 软件中常用），广泛用于传统图像编辑工具（如 GIMP、早期
-              Photoshop）的调色面板，其优势在于调节明度时可以保持色调和饱和度的相对稳定，适合控制颜色的亮度层次。</a>
+              Photoshop）的调色面板，其优势在于调节明度时可以保持色调和饱和度的相对稳定，适合控制颜色的亮度层次。</p>
           </div>
           <div class="color-value">
             <div><label>H</label><input id="hsv:h"></div>
@@ -283,9 +282,9 @@
             <span class="toggle-icon" aria-hidden="true">▸</span>
           </button>
           <div class="card-description collapsed" id="desc-lms">
-            <a>LMS 是基于人眼三种视锥细胞（长波 L、中波 M、短波 S）响应的色彩空间，直接关联到生理层面的颜色感知。通常由 CIE XYZ 经过线性变换得到（如 Hunt-Pointer-Estevez 变换或
+            <p>LMS 是基于人眼三种视锥细胞（长波 L、中波 M、短波 S）响应的色彩空间，直接关联到生理层面的颜色感知。通常由 CIE XYZ 经过线性变换得到（如 Hunt-Pointer-Estevez 变换或
               CAT02 的 LMS）。LMS 空间的核心用途是作为色适应变换的桥梁：在不同光照白点下，通过在 LMS 空间内对三通道各自进行缩放（Von Kries
-              规则），可使颜色看起来更符合人眼的适应性，从而广泛应用于白平衡校正、ICC 色彩管理等色彩科学领域。</a>
+              规则），可使颜色看起来更符合人眼的适应性，从而广泛应用于白平衡校正、ICC 色彩管理等色彩科学领域。</p>
           </div>
           <div class="color-value">
             <div><label>L</label><input id="lms:l"></div>

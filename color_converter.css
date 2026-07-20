@@ -60,6 +60,7 @@ input {
 .header {
     align-self: center;
     text-align: center;
+    color: var(--fg-muted)
 }
 
 .cards-row {
@@ -94,6 +95,7 @@ input {
 
 .card:hover {
     background: var(--bg-card-hover);
+    box-shadow: 0 4px 20px var(--shadow);
 }
 
 @container cards-column (width > 1000px) {
@@ -106,10 +108,6 @@ input {
     .card {
         width: calc(33% - 10px);
     }
-}
-
-.card:hover {
-    box-shadow: 0 4px 20px var(--shadow);
 }
 
 .color-value {
@@ -205,6 +203,7 @@ button.color-alert {
     border-style: none;
     transition: all 0.1s;
     width: 12px;
+    background-color: var(--alert-default);
 }
 
 @container cards-column (width < 600px) {
@@ -212,10 +211,6 @@ button.color-alert {
         color: transparent;
         width: 2px;
     }
-}
-
-button.color-alert {
-    background-color: var(--alert-default);
 }
 
 button.color-alert:hover {
@@ -265,7 +260,6 @@ button.color-alert.invalid:hover {
 .color-plane {
     flex: 1;
     aspect-ratio: 16 / 9;
-    min-height: 100px;
     min-width: 0;
     cursor: crosshair;
     touch-action: none;
@@ -274,7 +268,6 @@ button.color-alert.invalid:hover {
 .polar-wheel {
     flex: none;
     aspect-ratio: 1;
-    min-height: 200px;
     min-width: 200px;
     cursor: crosshair;
     touch-action: none;
@@ -283,9 +276,9 @@ button.color-alert.invalid:hover {
 .polar-bar {
     flex: none;
     width: 20px;
-    min-height: 200px;
     min-width: 20px;
     border-radius: 8px;
+    cursor: crosshair;
     touch-action: none;
 }
 
@@ -310,7 +303,7 @@ button.color-alert.invalid:hover {
     margin-bottom: 0;
 }
 
-.card-description>a {
+.card-description>p {
     padding: 10px 24px;
     overflow: hidden;
 }
@@ -359,7 +352,7 @@ button.color-alert.invalid:hover {
         --fg-muted: #94a3b8;
         --fg-muted-hover: #e2e8f0;
 
-        --shadow: none;
+        --shadow: transparent;
 
         --outline-width: 0.5px;
         --outline-grey: oklch(40% 0 0);
