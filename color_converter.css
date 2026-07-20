@@ -161,6 +161,8 @@ input {
     width: 10em;
     min-width: 4px;
     max-width: max-content;
+    user-select: none;
+    cursor: ew-resize;
 }
 
 @container cards-column (width < 400px) {

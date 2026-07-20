@@ -319,7 +319,15 @@ function drawColorPlane(canvas, colorFn, mx, my) {
     ctx.stroke();
 }
 
+const drawTimeLimit = 100;
+
+let lastDrawTime = 0;
+
 function drawAllPlanes() {
+    const now = Date.now();
+    if (now - lastDrawTime < drawTimeLimit) return;
+    lastDrawTime = now;
+
     for (const cfg of PLANES) {
         const canvas = document.getElementById(cfg.id);
         if (!canvas || canvas.parentElement.classList.contains('collapsed')) continue;
@@ -557,11 +565,12 @@ window.addEventListener('resize', function () {
     resizeTimeout = setTimeout(drawAllPlanes, 100);
 });
 
-const pickTimeLimit = 100;
-
 let dragPlane = null;
 let dragCfg = null;
-let lastDragTime = 0;
+let dragLabel = null;
+let dragLabelInput = null;
+let dragLabelInitX = 0;
+let dragLabelInitVal = 0;
 
 function pickFromPlane(canvas, cfg, clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
@@ -593,63 +602,89 @@ function pickFromPlane(canvas, cfg, clientX, clientY) {
     updateAll(r, g, b, source);
 }
 
-function startDrag(e) {
+// ---- Plane drag ----
+
+function startPlaneDrag(e, clientX, clientY) {
     const canvas = e.target.closest('.color-plane');
     if (!canvas) return;
     const cfg = PLANES.find(p => p.id === canvas.id);
     if (!cfg) return;
-
     dragPlane = canvas;
     dragCfg = cfg;
-    lastDragTime = 0;
-    pickFromPlane(canvas, cfg, e.clientX, e.clientY);
+    pickFromPlane(canvas, cfg, clientX, clientY);
     e.preventDefault();
 }
 
-function moveDrag(e) {
+function movePlaneDrag(e, clientX, clientY) {
     if (!dragPlane) return;
-    const now = Date.now();
-    if (now - lastDragTime < pickTimeLimit) return;
-    lastDragTime = now;
-    pickFromPlane(dragPlane, dragCfg, e.clientX, e.clientY);
+    pickFromPlane(dragPlane, dragCfg, clientX, clientY);
     e.preventDefault();
 }
 
-function stopDrag() {
+// ---- Label drag ----
+
+function startLabelDrag(e, clientX) {
+    const label = e.target.closest('.color-value>div>label');
+    if (!label) return;
+    const input = label.parentElement.querySelector('input');
+    if (!input || input.readOnly) return;
+    dragLabel = label;
+    dragLabelInput = input;
+    dragLabelInitX = clientX;
+    dragLabelInitVal = parseFloat(input.value) || 0;
+    e.preventDefault();
+}
+
+function moveLabelDrag(e, clientX) {
+    if (!dragLabel) return;
+    const delta = clientX - dragLabelInitX;
+    const isUint = dragLabelInput.id.indexOf('-uint:') !== -1;
+    let step = isUint ? 1 : 0.003;
+    if (e.shiftKey) step *= 0.1;
+    let val = dragLabelInitVal + delta * step;
+    if (isUint) {
+        val = Math.round(Math.max(0, Math.min(255, val)));
+    } else {
+        val = Math.max(0, val);
+    }
+    dragLabelInput.value = val;
+    dragLabelInput.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function stopAllDrag() {
     dragPlane = null;
     dragCfg = null;
+    dragLabel = null;
+    dragLabelInput = null;
 }
 
-function startTouchDrag(e) {
-    const canvas = e.target.closest('.color-plane');
-    if (!canvas) return;
-    const cfg = PLANES.find(p => p.id === canvas.id);
-    if (!cfg) return;
+// ---- Event bindings ----
 
-    dragPlane = canvas;
-    dragCfg = cfg;
-    lastDragTime = 0;
-    const touch = e.touches[0];
-    pickFromPlane(canvas, cfg, touch.clientX, touch.clientY);
-    e.preventDefault();
-}
+document.addEventListener('mousedown', e => {
+    startPlaneDrag(e, e.clientX, e.clientY);
+    startLabelDrag(e, e.clientX);
+});
 
-function moveTouchDrag(e) {
-    if (!dragPlane) return;
-    const now = Date.now();
-    if (now - lastDragTime < pickTimeLimit) return;
-    lastDragTime = now;
-    const touch = e.touches[0];
-    pickFromPlane(dragPlane, dragCfg, touch.clientX, touch.clientY);
-    e.preventDefault();
-}
+document.addEventListener('mousemove', e => {
+    movePlaneDrag(e, e.clientX, e.clientY);
+    moveLabelDrag(e, e.clientX);
+});
 
-document.addEventListener('mousedown', startDrag);
-document.addEventListener('mousemove', moveDrag);
-document.addEventListener('mouseup', stopDrag);
-document.addEventListener('touchstart', startTouchDrag, { passive: false });
-document.addEventListener('touchmove', moveTouchDrag, { passive: false });
-document.addEventListener('touchend', stopDrag);
+document.addEventListener('mouseup', stopAllDrag);
+
+document.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    startPlaneDrag(e, t.clientX, t.clientY);
+    startLabelDrag(e, t.clientX);
+}, { passive: false });
+
+document.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    movePlaneDrag(e, t.clientX, t.clientY);
+    moveLabelDrag(e, t.clientX);
+}, { passive: false });
+
+document.addEventListener('touchend', stopAllDrag);
 
 document.addEventListener('transitionend', function (e) {
     if (e.target.classList.contains('color-planes') && !e.target.classList.contains('collapsed')) {
