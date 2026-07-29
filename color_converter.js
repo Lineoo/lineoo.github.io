@@ -241,6 +241,165 @@ function srgbFloatToUintClamped(r, g, b) {
     return [r, g, b].map(x => (Math.min(Math.max(Math.round(x * 255), 0), 255)));
 }
 
+// ===== WebGL2 Renderer =====
+
+const IS_P3 = (() => {
+    try {
+        return CSS.supports('color', 'color(display-p3 1 0 0)') &&
+               matchMedia('(color-gamut: p3)').matches;
+    } catch { return false; }
+})();
+const CLIP_MODE = (() => {
+    try {
+        const p = new URLSearchParams(location.search);
+        if (p.get('clip') === 'rec2020') return 'rec2020';
+        if (p.get('clip') === 'srgb') return 'srgb';
+        if (p.get('clip') === 'p3' && IS_P3) return 'p3';
+    } catch {}
+    return IS_P3 ? 'p3' : 'srgb';
+})();
+const CS = CLIP_MODE === 'srgb' ? 'srgb' : (IS_P3 ? 'display-p3' : 'srgb');
+
+document.getElementById('gamut-info').textContent =
+    '显示器色域：' + (IS_P3 ? 'P3 广色域' : 'sRGB') +
+    '\u2003裁定标准：' + {srgb:'sRGB', p3:'Display P3', rec2020:'Rec.2020'}[CLIP_MODE] +
+    '\u2003输出：' + (CS === 'display-p3' ? 'Display P3' : 'sRGB') +
+    (CLIP_MODE === 'rec2020' ? '（Rec.2020 值经由 P3 近似显示）' : '');
+
+class WebGLColorRenderer {
+    constructor() {
+        this.c = document.createElement('canvas');
+        this.gl = this.c.getContext('webgl2', {
+            preserveDrawingBuffer: true,
+            premultipliedAlpha: false,
+            alpha: true,
+            drawingBufferColorSpace: CS,
+        });
+        if (!this.gl) throw new Error('WebGL2 not available');
+        this.prog = {};
+        this.vao = null;
+        this.ready = false;
+    }
+
+    async init() {
+        const gl = this.gl;
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+        this.vao = gl.createVertexArray();
+        gl.bindVertexArray(this.vao);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        gl.bindVertexArray(null);
+
+        const vertSrc = await fetch('shaders/quad.vert').then(r => r.text());
+        const [pT, wT, bT] = await Promise.all([
+            fetch('shaders/plane_template.frag').then(r => r.text()),
+            fetch('shaders/wheel_template.frag').then(r => r.text()),
+            fetch('shaders/bar_template.frag').then(r => r.text()),
+        ]);
+        const clipSrc = await fetch('shaders/clip_' + CLIP_MODE + '.glsl').then(r => r.text())
+            .then(s => s.replace('__DISP__', IS_P3 ? 'srgbToP3' : 'sRGBPassthrough'));
+        const spaceNames = ['srgb','srgb-linear','p3','rec2020','lms','oklab','oklch','hsl','hsv'];
+        const polarSpaces = new Set(['hsl','hsv','oklch']);
+
+        for (const n of spaceNames) {
+            const conv = await fetch('shaders/' + n + '.glsl').then(r => r.text());
+            this.prog[n] = {
+                p: this._link(vertSrc, pT.replace('__CONVERT__', conv).replace('__CLIP__', clipSrc)),
+            };
+            if (polarSpaces.has(n)) {
+                this.prog[n].w = this._link(vertSrc, wT.replace('__CONVERT__', conv).replace('__CLIP__', clipSrc));
+                this.prog[n].b = this._link(vertSrc, bT.replace('__CONVERT__', conv).replace('__CLIP__', clipSrc));
+            }
+        }
+        this.ready = true; drawAllPlanes();
+    }
+
+    _compile(type, src) {
+        const gl = this.gl, s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(s));
+            return null;
+        }
+        return s;
+    }
+
+    _link(vs, fs) {
+        const gl = this.gl;
+        const v = this._compile(gl.VERTEX_SHADER, vs);
+        const f = this._compile(gl.FRAGMENT_SHADER, fs);
+        if (!v || !f) return null;
+        const p = gl.createProgram();
+        gl.attachShader(p, v);
+        gl.attachShader(p, f);
+        gl.bindAttribLocation(p, 0, 'a_pos');
+        gl.linkProgram(p);
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+            console.error(gl.getProgramInfoLog(p));
+            return null;
+        }
+        const u = {};
+        for (let i = 0, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); i < n; i++) {
+            const info = gl.getActiveUniform(p, i);
+            u[info.name] = gl.getUniformLocation(p, info.name);
+        }
+        return { p, u };
+    }
+
+    _draw(target, name, tp, compA, compB, fixed, radMax, cx, cy, rA, rB) {
+        const gl = this.gl;
+        const r = target.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const w = Math.floor(r.width * dpr), h = Math.floor(r.height * dpr);
+        if (w < 1 || h < 1) return;
+        this.c.width = w;
+        this.c.height = h;
+        target.width = w;
+        target.height = h;
+        gl.viewport(0, 0, w, h);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        const sh = this.prog[name];
+        if (!sh || !sh[tp]) return;
+        const pg = sh[tp];
+        gl.useProgram(pg.p);
+        const u = pg.u;
+        gl.uniform2f(u.u_res, w, h);
+        gl.uniform2f(u.u_cross, cx, cy);
+        if (tp === 'p' || tp === 'w') { gl.uniform1i(u.u_compA, compA); gl.uniform1i(u.u_compB, compB); }
+        if (tp === 'b') gl.uniform1i(u.u_compA, compA);
+        gl.uniform3f(u.u_fixedAll, fixed[0], fixed[1], fixed[2]);
+        if (tp === 'p') { gl.uniform2f(u.u_rangeA, rA[0], rA[1]); gl.uniform2f(u.u_rangeB, rB[0], rB[1]); }
+        if (tp === 'w') gl.uniform1f(u.u_radMax, radMax);
+        gl.bindVertexArray(this.vao);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        target.getContext('2d', { colorSpace: CS }).drawImage(this.c, 0, 0);
+    }
+}
+
+let _gl = null, _glFailed = false;
+function getGL() {
+    if (_glFailed) return null;
+    if (_gl !== null) return _gl;
+    try {
+        _gl = new WebGLColorRenderer();
+        _gl.init().catch(e => {
+            console.warn('WebGL2 init failed:', e);
+            _gl = null; _glFailed = true;
+            document.getElementById('cpu-warn').style.display = '';
+        });
+        _gl.init().then(() => document.getElementById('cpu-warn').style.display = 'none');
+    } catch (e) {
+        _gl = null; _glFailed = true;
+        document.getElementById('cpu-warn').style.display = '';
+    }
+    return _gl;
+}
+
+
 // ===== UI Logic =====// 
 
 let updating = false;
@@ -378,8 +537,14 @@ function writeHs(space, v) {
 
 // ---- Plane drawing ----
 
-function drawColorPlane(canvas, colorFn, mx, my) {
+function drawColorPlane(canvas, colorFn, mx, my, _glInfo) {
     if (!canvas) return;
+    const gl = getGL();
+    if (gl && gl.ready && _glInfo) {
+        const [sp, cA, cB, fixAll, rA, rB] = _glInfo;
+        gl._draw(canvas, sp, 'p', cA, cB, fixAll, 0, mx, my, rA, rB);
+        return;
+    }
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     const w = Math.floor(rect.width * dpr), h = Math.floor(rect.height * dpr);
@@ -422,8 +587,14 @@ function drawColorPlane(canvas, colorFn, mx, my) {
     ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.stroke();
 }
 
-function drawWheel(canvas, space, radKey, angKey, radMax) {
+function drawWheel(canvas, space, radKey, angKey, radMax, _glInfo) {
     if (!canvas) return;
+    const gl = getGL();
+    if (gl && gl.ready && _glInfo) {
+        const [sp, cAng, cRad, fixAll, rm, cx, cy] = _glInfo;
+        gl._draw(canvas, sp, 'w', cAng, cRad, fixAll, rm, cx, cy, [0,1], [0,1]);
+        return;
+    }
     radMax = radMax || 1;
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
@@ -436,12 +607,12 @@ function drawWheel(canvas, space, radKey, angKey, radMax) {
     if (!canvas._buf || canvas._buf.w !== w || canvas._buf.h !== h)
         canvas._buf = { w, h, data: ctx.createImageData(w, h) };
     const imageData = canvas._buf.data;
-    const cx = w / 2, cy = h / 2, maxR = Math.min(w, h) / 2;
+    const cx2 = w / 2, cy2 = h / 2, maxR = Math.min(w, h) / 2;
     const v = readHs(space);
 
     for (let py = 0; py < h; py++) {
         for (let px = 0; px < w; px++) {
-            const dx = px - cx, dy = py - cy;
+            const dx = px - cx2, dy = py - cy2;
             const r = Math.sqrt(dx * dx + dy * dy);
             const idx = (py * w + px) * 4;
             if (r > maxR) { imageData.data[idx + 3] = 0; continue; }
@@ -469,8 +640,8 @@ function drawWheel(canvas, space, radKey, angKey, radMax) {
     ctx.putImageData(imageData, 0, 0);
 
     const rad = (v[radKey] || 0) / radMax, ang = (v[angKey] || 0) * Math.PI * 2;
-    const mx = Math.round(cx + rad * maxR * Math.cos(ang));
-    const my = Math.round(cy - rad * maxR * Math.sin(ang));
+    const mx = Math.round(cx2 + rad * maxR * Math.cos(ang));
+    const my = Math.round(cy2 - rad * maxR * Math.sin(ang));
 
     ctx.strokeStyle = 'oklch(50% 0 0 / 0.7)';
     ctx.lineWidth = 1;
@@ -478,8 +649,14 @@ function drawWheel(canvas, space, radKey, angKey, radMax) {
     ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(w, my); ctx.stroke();
 }
 
-function drawBar(canvas, space, varKey) {
+function drawBar(canvas, space, varKey, _glInfo) {
     if (!canvas) return;
+    const gl = getGL();
+    if (gl && gl.ready && _glInfo) {
+        const [sp, cVar, fixAll, cx, cy] = _glInfo;
+        gl._draw(canvas, sp, 'b', cVar, 0, fixAll, 0, cx, cy, [0,1], [0,1]);
+        return;
+    }
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     const w = Math.floor(rect.width * dpr), h = Math.floor(rect.height * dpr);
@@ -529,6 +706,12 @@ let lastDrawTime = 0;
 let drawDebounce = null;
 
 function drawAllPlanes() {
+    const gl = getGL();
+    if (gl && gl.ready) {
+        clearTimeout(drawDebounce); drawPlanesNow(); return;
+    }
+    if (IS_P3) return; // on P3, wait for GPU — CPU writes sRGB to P3 canvas
+
     const now = Date.now();
     if (now - lastDrawTime >= drawTimeLimit) {
         lastDrawTime = now;
@@ -543,6 +726,10 @@ function drawAllPlanes() {
 }
 
 function drawPlanesNow() {
+    const gl = getGL();
+    const useGL = gl && gl.ready;
+    if (IS_P3 && !useGL) return;
+
     for (const cfg of PLANES) {
         const canvas = document.getElementById(cfg.id);
         if (!canvas || canvas.parentElement.classList.contains('collapsed')) continue;
@@ -550,6 +737,17 @@ function drawPlanesNow() {
 
         const xMin = cfg.xMin ?? 0, xMax = cfg.xMax ?? 1;
         const yMin = cfg.yMin ?? 0, yMax = cfg.yMax ?? 1;
+
+        let glInfo = null;
+        if (useGL) {
+            const keys = SPACES[cfg.space].keys;
+            const cA = keys.indexOf(cfg.x);
+            const cB = keys.indexOf(cfg.y);
+            const fixKey = keys.find(k => k !== cfg.x && k !== cfg.y);
+            const fixAll = [0, 0, 0];
+            fixAll[keys.indexOf(fixKey)] = v[fixKey];
+            glInfo = [cfg.space, cA, cB, fixAll, [xMin, xMax], [yMin, yMax]];
+        }
 
         drawColorPlane(
             canvas,
@@ -560,15 +758,44 @@ function drawPlanesNow() {
                 return SPACES[cfg.space].toSrgb(vals);
             },
             (v[cfg.x] - xMin) / (xMax - xMin),
-            1 - (v[cfg.y] - yMin) / (yMax - yMin)
+            1 - (v[cfg.y] - yMin) / (yMax - yMin),
+            glInfo
         );
     }
 
     for (const p of POLARS) {
         const canvas = document.getElementById(p.id);
         if (!canvas || canvas.parentElement.classList.contains('collapsed')) continue;
-        if (p.type === 'wheel') drawWheel(canvas, p.space, p.rad, p.ang, p.radMax);
-        else drawBar(canvas, p.space, p.var);
+        if (p.type === 'wheel') {
+            let glInfo = null;
+            if (useGL) {
+                const v = readHs(p.space);
+                const keys = SPACES[p.space].keys;
+                const cAng = keys.indexOf(p.ang);
+                const cRad = keys.indexOf(p.rad);
+                const fixAll = [0, 0, 0];
+                fixAll[keys.indexOf(p.fix)] = v[p.fix];
+                const rm = p.radMax || 1;
+                const rad = (v[p.rad] || 0) / rm;
+                const ang = (v[p.ang] || 0) * Math.PI * 2;
+                glInfo = [p.space, cAng, cRad, fixAll, rm,
+                    0.5 + rad * 0.5 * Math.cos(ang),
+                    0.5 - rad * 0.5 * Math.sin(ang)];
+            }
+            drawWheel(canvas, p.space, p.rad, p.ang, p.radMax, glInfo);
+        } else {
+            let glInfo = null;
+            if (useGL) {
+                const v = readHs(p.space);
+                const keys = SPACES[p.space].keys;
+                const cVar = keys.indexOf(p.var);
+                const fixAll = [0, 0, 0];
+                fixAll[keys.indexOf(p.hue)] = v[p.hue];
+                fixAll[keys.indexOf(p.sat)] = v[p.sat];
+                glInfo = [p.space, cVar, fixAll, -1, 1 - (v[p.var] || 0)];
+            }
+            drawBar(canvas, p.space, p.var, glInfo);
+        }
     }
 }
 

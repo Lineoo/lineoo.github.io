@@ -1,0 +1,18 @@
+vec3 toSrgb(vec3 lch) {
+    float hr = lch.z * 6.2831853;
+    vec3 lab = vec3(lch.x, lch.y*cos(hr), lch.y*sin(hr));
+    float l_ = lab.x + 0.3963377774*lab.y + 0.2158037573*lab.z;
+    float m_ = lab.x - 0.1055613458*lab.y - 0.0638541728*lab.z;
+    float s_ = lab.x - 0.0894841775*lab.y - 1.2914855480*lab.z;
+    vec3 lms = vec3(l_*l_*l_, m_*m_*m_, s_*s_*s_);
+    vec3 lin = vec3(
+         4.0767416621*lms.r - 3.3077115913*lms.g + 0.2309699292*lms.b,
+        -1.2684380046*lms.r + 2.6097574011*lms.g - 0.3413193965*lms.b,
+        -0.0041960863*lms.r - 0.7034186147*lms.g + 1.7076147010*lms.b
+    );
+    return vec3(
+        lin.r <= 0.0031308 ? lin.r * 12.92 : 1.055*pow(lin.r, 1.0/2.4)-0.055,
+        lin.g <= 0.0031308 ? lin.g * 12.92 : 1.055*pow(lin.g, 1.0/2.4)-0.055,
+        lin.b <= 0.0031308 ? lin.b * 12.92 : 1.055*pow(lin.b, 1.0/2.4)-0.055
+    );
+}

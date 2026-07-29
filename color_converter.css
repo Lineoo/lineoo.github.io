@@ -340,6 +340,26 @@ button.color-alert.invalid:hover {
     transform: rotate(90deg);
 }
 
+#cpu-warn {
+    margin: 8px 0;
+    padding: 10px 24px;
+    border-radius: 8px;
+    background: oklch(90% 0.06 60);
+    color: oklch(30% 0.06 40);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+#gamut-info {
+    margin: 8px 0;
+    padding: 10px 24px;
+    border-radius: 8px;
+    background: var(--bg-card);
+    color: var(--fg-muted);
+    font-size: 13px;
+    font-weight: 500;
+}
+
 @media (prefers-color-scheme: dark) {
     :root {
         --bg: oklab(20% 0 0);
