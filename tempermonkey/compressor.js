@@ -4,7 +4,16 @@
 // @version      5.0
 // @description  自动将视频响度归一化到统一目标电平（AGC 方案，含悬浮控制面板）
 // @author       You
-// @match        *://*/*
+// @match        *://*.bilibili.com/*
+// @match        *://*.youtube.com/*
+// @match        *://*.iqiyi.com/*
+// @match        *://*.youku.com/*
+// @match        *://*.v.qq.com/*
+// @match        *://*.acfun.cn/*
+// @match        *://*.mgtv.com/*
+// @match        *://*.ixigua.com/*
+// @match        *://*.douyin.com/*
+// @match        *://*.kuaishou.com/*
 // @grant        none
 // ==/UserScript==
 
@@ -26,6 +35,8 @@
         --agc-green: #50a070;
         --agc-red: #c05050;
         --agc-shadow: rgba(0,0,0,0.10);
+        --agc-btn-hover: #5e5e80;
+        --agc-btn-muted: #c8c8d8;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -41,8 +52,33 @@
           --agc-green: #58b878;
           --agc-red: #d86868;
           --agc-shadow: rgba(0,0,0,0.45);
+          --agc-btn-hover: #6e6e90;
+          --agc-btn-muted: #2a2a3c;
         }
       }
+      .__vEq-card { padding:8px 12px; margin:8px 0; background:var(--agc-card); border-radius:8px; }
+      .__vEq-card-tight { padding:6px 12px; }
+      .__vEq-meter-row { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; }
+      .__vEq-bar { width:100%; height:6px; background:var(--agc-bar-bg); border-radius:3px; overflow:hidden; }
+      .__vEq-bar-f { height:100%; border-radius:3px; }
+      .__vEq-group-title { font-size:10px; color:var(--agc-muted); text-transform:uppercase; letter-spacing:1px; margin:10px 0 6px; }
+      .__vEq-slider-row { margin-bottom:6px; }
+      .__vEq-slider-label { display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px; }
+      .__vEq-slider { width:100%; height:3px; accent-color:var(--agc-accent); cursor:pointer; }
+      .__vEq-header { display:flex; justify-content:space-between; align-items:center; cursor:move; padding-bottom:8px; border-bottom:1px solid var(--agc-border); }
+      .__vEq-header-actions { display:flex; align-items:center; gap:8px; }
+      .__vEq-header-btn { cursor:pointer; line-height:1; }
+      .__vEq-toggle-row { display:flex; align-items:center; gap:10px; padding:8px 12px; }
+      .__vEq-toggle { position:relative; display:inline-block; width:40px; height:22px; cursor:pointer; }
+      .__vEq-toggle-input { opacity:0; width:0; height:0; }
+      .__vEq-toggle-track { position:absolute; inset:0; border-radius:22px; transition:background .3s; }
+      .__vEq-toggle-knob { position:absolute; top:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:left .3s; }
+      .__vEq-footer { margin-top:8px; padding-top:8px; border-top:1px solid var(--agc-border); font-size:11px; color:var(--agc-muted); text-align:center; }
+      .__vEq-sliders { max-height:340px; overflow-y:auto; padding-right:4px; }
+      #__vEqBtn { position:fixed; z-index:2147483647; bottom:20px; right:20px; width:44px; height:44px; border-radius:50%; background:var(--agc-accent); color:#fff; cursor:pointer; display:none; align-items:center; justify-content:center; font-weight:bold; font-size:10px; font-family:sans-serif; user-select:none; transition:background .2s; }
+      #__vEqBtn:hover { background:var(--agc-btn-hover); }
+      #__vEqBtn.--muted { background:var(--agc-btn-muted); }
+      #__vEqPanel { position:fixed; z-index:2147483647; bottom:76px; right:20px; width:300px; background:var(--agc-bg); color:var(--agc-text); border-radius:12px; font:14px/1.5 sans-serif; padding:16px; display:none; user-select:none; }
     `;
     document.head.appendChild(style);
 
@@ -93,9 +129,13 @@
     const PANEL_ID = '__vEqPanel';
     const BTN_ID = '__vEqBtn';
     let agcIntervalId = null;
+    let ui = null;
+
+    const MAX_CHAINS = 8;
 
     function applyAGC(video) {
         if (!video || typeof video !== 'object' || processedSources.has(video)) return;
+        if (activeChains.size >= MAX_CHAINS) return;
 
         let audioContext;
         try {
@@ -129,31 +169,44 @@
             return;
         }
 
+        const shelf = audioContext.createIIRFilter(
+            [1.53512485958697, -2.69169618940638, 1.19839281085285],
+            [1.0, -1.69065929318241, 0.73248077421585]
+        );
+        const hp = audioContext.createIIRFilter(
+            [1.0, -2.0, 1.0],
+            [1.0, -1.99004745483398, 0.99007225036621]
+        );
+
         const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
+        analyser.fftSize = 1024;
 
-        const gainNode = audioContext.createGain();
-        gainNode.gain.value = 1;
-
-        source.connect(analyser);
-        if (isEnabled) {
-            analyser.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-        } else {
-            analyser.connect(audioContext.destination);
-        }
+        source.connect(shelf);
+        shelf.connect(hp);
+        hp.connect(analyser);
+        analyser.connect(audioContext.destination);
 
         processedSources.add(video);
 
-        const chain = { source, analyser, gainNode, audioContext, video, currentGain: 0, smoothedDb: CONFIG.initLevel };
+        const chain = {
+            source, analyser, audioContext, video,
+            state: 'measuring',
+            gainNode: null, currentGain: 0, smoothedDb: CONFIG.initLevel
+        };
         activeChains.set(video, chain);
 
         video.addEventListener('emptied', () => {
-            const chain = activeChains.get(video);
-            if (chain) {
-                chain.currentGain = 0;
-                chain.smoothedDb = CONFIG.initLevel;
-                chain.gainNode.gain.value = 1;
+            const c = activeChains.get(video);
+            if (c) {
+                c.state = 'measuring';
+                c.currentGain = 0;
+                c.smoothedDb = CONFIG.initLevel;
+                if (c.gainNode) {
+                    try { c.gainNode.disconnect(); } catch (e) {}
+                    c.gainNode = null;
+                    try { c.analyser.disconnect(); } catch (e) {}
+                    c.analyser.connect(audioContext.destination);
+                }
             }
         });
 
@@ -165,6 +218,7 @@
         isEnabled = enabled;
         saveState();
         for (const [, chain] of activeChains) {
+            if (!chain.gainNode) continue;
             try {
                 chain.analyser.disconnect();
                 if (enabled) {
@@ -187,6 +241,19 @@
         updateUI();
     }
 
+    const AUDIO_THRESHOLD = -45;
+
+    function promoteChain(chain) {
+        chain.state = 'active';
+        const gn = chain.audioContext.createGain();
+        gn.gain.value = Math.pow(10, chain.currentGain / 20);
+        chain.gainNode = gn;
+        try { chain.analyser.disconnect(); } catch (e) {}
+        chain.analyser.connect(gn);
+        gn.connect(chain.audioContext.destination);
+        updateUI();
+    }
+
     function agcLoop() {
         const chains = [...activeChains.values()];
         if (chains.length === 0) return;
@@ -201,8 +268,14 @@
                 for (let i = 0; i < data.length; i++) sumSq += data[i] * data[i];
                 const rms = Math.sqrt(sumSq / data.length);
                 const instantDb = 20 * Math.log10(Math.max(rms, 1e-10));
-                const outputDb = instantDb + chain.currentGain;
 
+                if (chain.state === 'measuring') {
+                    if (!isEnabled) continue;
+                    if (instantDb > AUDIO_THRESHOLD) promoteChain(chain);
+                    continue;
+                }
+
+                const outputDb = instantDb + chain.currentGain;
                 const levelWeight = Math.exp((outputDb - CONFIG.levelBase) / CONFIG.levelScale);
 
                 if (levelWeight > 1e-6) {
@@ -211,17 +284,16 @@
                     chain.smoothedDb += (instantDb - chain.smoothedDb) * step;
                 }
 
-                let desiredDb = CONFIG.targetLevel - chain.smoothedDb + CONFIG.gainBias;
+                let desiredDb = CONFIG.targetLevel - chain.smoothedDb;
                 desiredDb = Math.max(CONFIG.minGain, Math.min(CONFIG.maxGain, desiredDb));
 
                 const error = Math.abs(desiredDb - chain.currentGain);
-                const blend = levelWeight * error;
-                const tau = Math.max(CONFIG.tauBase * Math.exp(-CONFIG.tauSteep * blend), 0.01);
+                const tau = Math.max(CONFIG.tauBase * Math.exp(-CONFIG.tauSteep * error), 0.01);
                 const coeff = 1 - Math.exp(-dt / tau);
                 chain.currentGain += (desiredDb - chain.currentGain) * coeff;
 
-                if (isEnabled) {
-                    chain.gainNode.gain.value = Math.pow(10, chain.currentGain / 20);
+                if (isEnabled && chain.gainNode) {
+                    chain.gainNode.gain.value = Math.pow(10, (chain.currentGain + CONFIG.gainBias) / 20);
                 }
             } catch (e) { /* skip this chain */ }
         }
@@ -258,32 +330,55 @@
 
         const btn = document.createElement('div');
         btn.id = BTN_ID;
-        btn.textContent = 'AGC';
-        Object.assign(btn.style, {
-            position: 'fixed', zIndex: 2147483647, bottom: '20px', right: '20px',
-            width: '44px', height: '44px', borderRadius: '50%',
-            background: 'var(--agc-accent)', color: '#fff', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 'bold', fontSize: '13px', fontFamily: 'sans-serif',
-            userSelect: 'none', opacity: '0.85',
-            boxShadow: '0 2px 12px var(--agc-shadow)', transition: 'transform .2s'
-        });
-        btn.onmouseenter = () => btn.style.transform = 'scale(1.1)';
-        btn.onmouseleave = () => btn.style.transform = 'scale(1)';
-        btn.onclick = togglePanel;
         document.body.appendChild(btn);
+
+        let dragY = null, dragBias = 0, dragged = false;
+        btn.addEventListener('mousedown', e => {
+            dragY = e.clientY;
+            dragBias = CONFIG.gainBias;
+            dragged = false;
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', e => {
+            if (dragY === null) return;
+            const dy = dragY - e.clientY;
+            if (Math.abs(dy) > 2) dragged = true;
+            const raw = Math.max(-12, Math.min(12, dragBias + dy * 0.2));
+            CONFIG.gainBias = Math.round(raw * 10) / 10;
+            const gainDb = activeChains.size > 0 ? [...activeChains.values()][0].currentGain : 0;
+            btn.textContent = `${(gainDb + CONFIG.gainBias) >= 0 ? '+' : ''}${(gainDb + CONFIG.gainBias).toFixed(1)} dB`;
+        });
+        document.addEventListener('mouseup', e => {
+            if (dragY === null) return;
+            dragY = null;
+            if (dragged) {
+                setConfig('gainBias', CONFIG.gainBias);
+            } else {
+                togglePanel();
+            }
+        });
 
         const panel = document.createElement('div');
         panel.id = PANEL_ID;
-        Object.assign(panel.style, {
-            position: 'fixed', zIndex: 2147483647, bottom: '76px', right: '20px',
-            width: '300px', background: 'var(--agc-bg)', color: 'var(--agc-text)',
-            borderRadius: '12px', font: '14px/1.5 sans-serif',
-            boxShadow: '0 8px 32px var(--agc-shadow)', padding: '16px',
-            display: 'none', userSelect: 'none'
-        });
         panel.innerHTML = buildPanelHTML();
         document.body.appendChild(panel);
+
+        ui = {
+            btn,
+            panel,
+            header: panel.querySelector('#__vEqHeader'),
+            count: panel.querySelector('#__vEqCount'),
+            toggle: panel.querySelector('#__vEqToggle'),
+            toggleSlider: panel.querySelector('#__vEqSlider'),
+            toggleKnob: panel.querySelector('#__vEqSlider span'),
+            status: panel.querySelector('#__vEqStatus'),
+            avgBar: panel.querySelector('#__vEqAvgBar'),
+            avgLbl: panel.querySelector('#__vEqAvgDb'),
+            gainBar: panel.querySelector('#__vEqGainBar'),
+            gainLbl: panel.querySelector('#__vEqGainDb'),
+            reset: panel.querySelector('#__vEqReset'),
+            close: panel.querySelector('#__vEqClose'),
+        };
 
         makeDraggable(panel);
         attachPanelEvents(panel);
@@ -293,14 +388,14 @@
         const active = activeChains.size;
         const groups = [
             { title: '响度规格', items: [
-                { key: 'targetLevel', label: '目标响度', unit: 'dB', min: -30, max: -10, step: 0.5 },
+                { key: 'targetLevel', label: '目标响度', unit: 'LKFS', min: -30, max: -10, step: 0.5 },
                 { key: 'maxGain', label: '最大增益', unit: 'dB', min: 0, max: 30, step: 1 },
                 { key: 'minGain', label: '最小增益', unit: 'dB', min: -30, max: 0, step: 1 },
                 { key: 'gainBias', label: '增益偏置', unit: 'dB', min: -12, max: 12, step: 0.5 }
             ]},
             { title: '响度测算', items: [
                 { key: 'rmsWindow', label: '测算时间', unit: 's', min: 0.2, max: 5, step: 0.2 },
-                { key: 'levelBase', label: '电平基准', unit: 'dB', min: -60, max: 0, step: 1 },
+                { key: 'levelBase', label: '电平基准', unit: 'LKFS', min: -60, max: 0, step: 1 },
                 { key: 'levelScale', label: '电平陡度', unit: '', min: 4, max: 16, step: 1 }
             ]},
             { title: '增益执行', items: [
@@ -308,120 +403,111 @@
                 { key: 'tauSteep', label: '误差陡度', unit: '', min: 0.1, max: 2, step: 0.05 }
             ]},
             { title: '高级选项', items: [
-                { key: 'initLevel', label: '初始响度', unit: 'dB', min: -30, max: -10, step: 1 }
+                { key: 'initLevel', label: '初始响度', unit: 'LKFS', min: -30, max: -10, step: 1 }
             ]}
         ];
 
         let sliders = groups.map(g => {
-            const sectionLabel = `<div style="font-size:10px;color:var(--agc-muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px">${g.title}</div>`;
+            const title = `<div class="__vEq-group-title">${g.title}</div>`;
             const rows = g.items.map(p => {
                 const val = CONFIG[p.key];
                 return `
-                <div style="margin-bottom:6px">
-                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">
+                <div class="__vEq-slider-row">
+                    <div class="__vEq-slider-label">
                         <span>${p.label}</span>
                         <span id="__vEqVal_${p.key}">${val}${p.unit}</span>
                     </div>
-                    <input type="range" id="__vEqRange_${p.key}"
+                    <input type="range" id="__vEqRange_${p.key}" class="__vEq-slider"
                         data-key="${p.key}" data-unit="${p.unit}"
-                        min="${p.min}" max="${p.max}" step="${p.step}" value="${val}"
-                        style="width:100%;height:3px;accent-color:var(--agc-accent);cursor:pointer">
+                        min="${p.min}" max="${p.max}" step="${p.step}" value="${val}">
                 </div>`;
             }).join('');
-            return sectionLabel + rows;
+            return title + rows;
         }).join('');
 
         return `
-            <div id="__vEqHeader" style="display:flex;justify-content:space-between;align-items:center;cursor:move;padding-bottom:8px;border-bottom:1px solid var(--agc-border)">
+            <div id="__vEqHeader" class="__vEq-header">
                 <span style="font-weight:bold;font-size:15px">\u{1F50A} AGC \u{97F3}\u{91CF}\u{5F52}\u{4E00}\u{5316}</span>
-                <div style="display:flex;align-items:center;gap:8px">
+                <div class="__vEq-header-actions">
                     <span id="__vEqCount" style="font-size:12px;color:var(--agc-muted)">${active} \u{4E2A}\u{89C6}\u{9891}</span>
-                    <span id="__vEqReset" style="cursor:pointer;font-size:14px;line-height:1" title="\u{91CD}\u{7F6E}\u{9ED8}\u{8BA4}">\u{21BA}</span>
-                    <span id="__vEqClose" style="cursor:pointer;font-size:18px;line-height:1">&times;</span>
+                    <span id="__vEqReset" class="__vEq-header-btn" style="font-size:14px" title="\u{91CD}\u{7F6E}\u{9ED8}\u{8BA4}">\u{21BA}</span>
+                    <span id="__vEqClose" class="__vEq-header-btn" style="font-size:18px">&times;</span>
                 </div>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;margin:10px 0;padding:8px 12px;background:var(--agc-card);border-radius:8px">
+            <div class="__vEq-card __vEq-toggle-row" style="margin-top:10px">
                 <span style="font-size:13px">\u{5F00}\u{542F}\u{5747}\u{8861}</span>
-                <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer">
-                    <input type="checkbox" id="__vEqToggle" ${isEnabled ? 'checked' : ''} style="opacity:0;width:0;height:0">
-                    <span id="__vEqSlider" style="position:absolute;inset:0;background:${isEnabled ? 'var(--agc-accent)' : 'var(--agc-bar-bg)'};border-radius:22px;transition:.3s">
-                        <span style="position:absolute;top:2px;left:${isEnabled ? '20px' : '2px'};width:18px;height:18px;background:#fff;border-radius:50%;transition:.3s"></span>
+                <label class="__vEq-toggle">
+                    <input type="checkbox" id="__vEqToggle" ${isEnabled ? 'checked' : ''} class="__vEq-toggle-input">
+                    <span id="__vEqSlider" class="__vEq-toggle-track" style="background:${isEnabled ? 'var(--agc-accent)' : 'var(--agc-bar-bg)'}">
+                        <span class="__vEq-toggle-knob" style="left:${isEnabled ? '20px' : '2px'}"></span>
                     </span>
                 </label>
                 <span id="__vEqStatus" style="font-size:12px;color:${isEnabled ? 'var(--agc-green)' : 'var(--agc-red)'}">${isEnabled ? '\u{5DF2}\u{542F}\u{7528}' : '\u{5DF2}\u{7981}\u{7528}'}</span>
             </div>
-            <div style="margin:8px 0;padding:8px 12px;background:var(--agc-card);border-radius:8px">
-                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <div class="__vEq-card">
+                <div class="__vEq-meter-row">
                     <span>\u{5E73}\u{5747}\u{54CD}\u{5EA6}</span>
-                    <span id="__vEqAvgDb">-\u221E dB</span>
+                    <span id="__vEqAvgDb">-\u221E LKFS</span>
                 </div>
-                <div style="width:100%;height:6px;background:var(--agc-bar-bg);border-radius:3px;overflow:hidden">
-                    <div id="__vEqAvgBar" style="width:0%;height:100%;background:var(--agc-blue);border-radius:3px"></div>
+                <div class="__vEq-bar">
+                    <div id="__vEqAvgBar" class="__vEq-bar-f" style="width:0%;background:var(--agc-blue)"></div>
                 </div>
             </div>
-            <div style="margin:8px 0;padding:8px 12px;background:var(--agc-card);border-radius:8px">
-                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <div class="__vEq-card">
+                <div class="__vEq-meter-row">
                     <span>\u{5F53}\u{524D}\u{589E}\u{76CA}</span>
                     <span id="__vEqGainDb">+0.0 dB</span>
                 </div>
-                <div style="width:100%;height:6px;background:var(--agc-bar-bg);border-radius:3px;overflow:hidden">
-                    <div id="__vEqGainBar" style="width:50%;height:100%;background:var(--agc-amber);border-radius:3px"></div>
+                <div class="__vEq-bar">
+                    <div id="__vEqGainBar" class="__vEq-bar-f" style="width:50%;background:var(--agc-amber)"></div>
                 </div>
             </div>
-            <div style="max-height:340px;overflow-y:auto;padding-right:4px">
+            <div class="__vEq-sliders">
                 ${sliders}
             </div>
-            <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--agc-border);font-size:11px;color:var(--agc-muted);text-align:center">
+            <div class="__vEq-footer">
                 \u{53C2}\u{6570}\u{5B9E}\u{65F6}\u{751F}\u{6548} \u{B7} \u{62D6}\u{52A8}\u{6807}\u{9898}\u{680F}\u{79FB}\u{52A8}\u{9762}\u{677F}
             </div>`;
     }
 
     function togglePanel() {
-        const panel = document.getElementById(PANEL_ID);
-        const btn = document.getElementById(BTN_ID);
-        if (!panel || !btn) return;
-        const show = panel.style.display === 'none';
-        panel.style.display = show ? 'block' : 'none';
-        btn.style.opacity = show ? '0.3' : '1';
+        if (!ui) return;
+        const show = ui.panel.style.display === 'none';
+        ui.panel.style.display = show ? 'block' : 'none';
+        ui.btn.classList.toggle('--muted', show);
         if (show) updateUI();
     }
 
     function updateMeters() {
         const chains = [...activeChains.values()];
         const chain = chains[0];
-        if (!chain) return;
+        if (!chain || !ui) return;
 
         const avgDb = chain.smoothedDb;
         const gainDb = chain.currentGain;
 
-        const aBar = document.getElementById('__vEqAvgBar');
-        const aLbl = document.getElementById('__vEqAvgDb');
         const aPct = Math.max(0, Math.min((avgDb + 45) / 45 * 100, 100));
-        if (aBar) aBar.style.width = aPct + '%';
-        if (aLbl) aLbl.textContent = avgDb > -70 ? `${avgDb.toFixed(1)} dB` : '-\u221E dB';
+        ui.avgBar.style.width = aPct + '%';
+        ui.avgLbl.textContent = avgDb > -70 ? `${avgDb.toFixed(1)} LKFS` : '-\u221E LKFS';
 
-        const gBar = document.getElementById('__vEqGainBar');
-        const gLbl = document.getElementById('__vEqGainDb');
         const total = CONFIG.maxGain - CONFIG.minGain || 1;
         const gPct = ((gainDb - CONFIG.minGain) / total) * 100;
-        if (gBar) gBar.style.width = Math.max(0, Math.min(gPct, 100)) + '%';
-        if (gLbl) gLbl.textContent = `${gainDb >= 0 ? '+' : ''}${gainDb.toFixed(1)} dB`;
+        ui.gainBar.style.width = Math.max(0, Math.min(gPct, 100)) + '%';
+        ui.gainLbl.textContent = `${gainDb >= 0 ? '+' : ''}${gainDb.toFixed(1)} dB`;
+
+        ui.btn.textContent = `${(gainDb + CONFIG.gainBias) >= 0 ? '+' : ''}${(gainDb + CONFIG.gainBias).toFixed(1)} dB`;
     }
 
     function updateUI() {
-        const countEl = document.getElementById('__vEqCount');
-        const toggle = document.getElementById('__vEqToggle');
-        const slider = document.getElementById('__vEqSlider');
-        const status = document.getElementById('__vEqStatus');
-        if (countEl) countEl.textContent = `${activeChains.size} 个视频`;
-        if (toggle && slider && status) {
-            toggle.checked = isEnabled;
-            slider.style.background = isEnabled ? 'var(--agc-accent)' : 'var(--agc-bar-bg)';
-            const knob = slider.querySelector('span');
-            if (knob) knob.style.left = isEnabled ? '20px' : '2px';
-            status.textContent = isEnabled ? '已启用' : '已禁用';
-            status.style.color = isEnabled ? 'var(--agc-green)' : 'var(--agc-red)';
-        }
+        if (!ui) return;
+        const activeCount = [...activeChains.values()].filter(c => c.state === 'active').length;
+        ui.count.textContent = `${activeCount}/${activeChains.size} 个视频`;
+        ui.toggle.checked = isEnabled;
+        ui.toggleSlider.style.background = isEnabled ? 'var(--agc-accent)' : 'var(--agc-bar-bg)';
+        ui.toggleKnob.style.left = isEnabled ? '20px' : '2px';
+        ui.status.textContent = isEnabled ? '已启用' : '已禁用';
+        ui.status.style.color = isEnabled ? 'var(--agc-green)' : 'var(--agc-red)';
+
         ['targetLevel', 'maxGain', 'minGain', 'gainBias', 'rmsWindow', 'levelBase', 'levelScale', 'tauBase', 'tauSteep', 'initLevel'].forEach(key => {
             const valEl = document.getElementById(`__vEqVal_${key}`);
             const range = document.getElementById(`__vEqRange_${key}`);
@@ -430,37 +516,36 @@
                 valEl.textContent = `${CONFIG[key]}${range.dataset.unit || ''}`;
             }
         });
+
+        if (ui.btn) ui.btn.style.display = activeCount > 0 ? 'flex' : 'none';
     }
 
     function attachPanelEvents(panel) {
         panel.addEventListener('change', e => {
             const t = e.target;
-            if (t.id.startsWith('__vEqRange_')) {
+            if (t.id && t.id.startsWith('__vEqRange_')) {
                 setConfig(t.dataset.key, parseFloat(t.value));
             }
         });
         panel.addEventListener('input', e => {
             const t = e.target;
-            if (t.id.startsWith('__vEqRange_')) {
+            if (t.id && t.id.startsWith('__vEqRange_')) {
                 const el = document.getElementById(`__vEqVal_${t.dataset.key}`);
                 if (el) el.textContent = `${t.value}${t.dataset.unit || ''}`;
             }
         });
-        document.getElementById('__vEqToggle')?.addEventListener('change', e => {
-            setEnabled(e.target.checked);
-        });
-        document.getElementById('__vEqReset')?.addEventListener('click', resetConfig);
-        document.getElementById('__vEqClose')?.addEventListener('click', () => {
-            panel.style.display = 'none';
-            const btn = document.getElementById(BTN_ID);
-            if (btn) btn.style.opacity = '1';
+        ui.toggle.addEventListener('change', e => setEnabled(e.target.checked));
+        ui.reset.addEventListener('click', resetConfig);
+        ui.close.addEventListener('click', () => {
+            ui.panel.style.display = 'none';
+            ui.btn.classList.remove('--muted');
         });
     }
 
     function makeDraggable(panel) {
-        const header = document.getElementById('__vEqHeader');
-        if (!header) return;
+        if (!ui || !ui.header) return;
         let ox, oy, mx, my, dragging = false;
+        const header = ui.header;
         header.addEventListener('mousedown', e => {
             dragging = true;
             ox = e.clientX; oy = e.clientY;
@@ -491,6 +576,15 @@
         createFloatingUI();
 
         agcIntervalId = setInterval(agcLoop, 50);
+
+        setInterval(() => {
+            for (const [video, chain] of activeChains) {
+                if (!document.body.contains(video)) {
+                    try { chain.analyser.disconnect(); } catch (e) {}
+                    activeChains.delete(video);
+                }
+            }
+        }, 5000);
 
         setInterval(processAllVideos, 2000);
         let lastUrl = location.href;
