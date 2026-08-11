@@ -75,10 +75,11 @@
       .__vEq-toggle-knob { position:absolute; top:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:left .3s; }
       .__vEq-footer { margin-top:8px; padding-top:8px; border-top:1px solid var(--agc-border); font-size:11px; color:var(--agc-muted); text-align:center; }
       .__vEq-sliders { max-height:340px; overflow-y:auto; padding-right:4px; }
+      .__vEq-canvas { display:block; width:100%; border-radius:4px; margin:4px 0; }
       #__vEqBtn { position:fixed; z-index:2147483647; bottom:20px; right:20px; width:44px; height:44px; border-radius:50%; background:var(--agc-accent); color:#fff; cursor:pointer; display:none; align-items:center; justify-content:center; font-weight:bold; font-size:10px; font-family:sans-serif; user-select:none; transition:background .2s; }
       #__vEqBtn:hover { background:var(--agc-btn-hover); }
       #__vEqBtn.--muted { background:var(--agc-btn-muted); }
-      #__vEqPanel { position:fixed; z-index:2147483647; bottom:76px; right:20px; width:300px; background:var(--agc-bg); color:var(--agc-text); border-radius:12px; font:14px/1.5 sans-serif; padding:16px; display:none; user-select:none; }
+      #__vEqPanel { position:fixed; z-index:2147483647; bottom:76px; right:20px; width:330px; background:var(--agc-bg); color:var(--agc-text); border-radius:12px; font:14px/1.5 sans-serif; padding:16px; display:none; user-select:none; }
     `;
     document.head.appendChild(style);
 
@@ -89,7 +90,7 @@
         gainBias: 0,
         rmsWindow: 5,
         levelBase: -18,
-        levelScale: 8,
+        levelSteep: 1.05,
         tauBase: 20,
         tauSteep: 0.5,
         initLevel: -18
@@ -276,7 +277,7 @@
                 }
 
                 const outputDb = instantDb + chain.currentGain;
-                const levelWeight = Math.exp((outputDb - CONFIG.levelBase) / CONFIG.levelScale);
+                const levelWeight = Math.pow(CONFIG.levelSteep, outputDb - CONFIG.levelBase);
 
                 if (levelWeight > 1e-6) {
                     const rmsCoeff = 1 - Math.exp(-dt / CONFIG.rmsWindow);
@@ -378,6 +379,8 @@
             gainLbl: panel.querySelector('#__vEqGainDb'),
             reset: panel.querySelector('#__vEqReset'),
             close: panel.querySelector('#__vEqClose'),
+            canvasL: panel.querySelector('#__vEqCanvasL'),
+            canvasT: panel.querySelector('#__vEqCanvasT'),
         };
 
         makeDraggable(panel);
@@ -393,12 +396,12 @@
                 { key: 'minGain', label: '最小增益', unit: 'dB', min: -30, max: 0, step: 1 },
                 { key: 'gainBias', label: '增益偏置', unit: 'dB', min: -12, max: 12, step: 0.5 }
             ]},
-            { title: '响度测算', items: [
+            { title: '响度测算', canvas: '__vEqCanvasL', items: [
                 { key: 'rmsWindow', label: '测算时间', unit: 's', min: 0.2, max: 5, step: 0.2 },
                 { key: 'levelBase', label: '电平基准', unit: 'LKFS', min: -60, max: 0, step: 1 },
-                { key: 'levelScale', label: '电平陡度', unit: '', min: 4, max: 16, step: 1 }
+                { key: 'levelSteep', label: '权重基数', unit: '', min: 1.01, max: 1.3, step: 0.01 }
             ]},
-            { title: '增益执行', items: [
+            { title: '增益执行', canvas: '__vEqCanvasT', items: [
                 { key: 'tauBase', label: '执行时间', unit: 's', min: 10, max: 120, step: 5 },
                 { key: 'tauSteep', label: '误差陡度', unit: '', min: 0.1, max: 2, step: 0.05 }
             ]},
@@ -409,6 +412,7 @@
 
         let sliders = groups.map(g => {
             const title = `<div class="__vEq-group-title">${g.title}</div>`;
+            const canvas = g.canvas ? `<canvas id="${g.canvas}" class="__vEq-canvas" width="268" height="70"></canvas>` : '';
             const rows = g.items.map(p => {
                 const val = CONFIG[p.key];
                 return `
@@ -422,7 +426,7 @@
                         min="${p.min}" max="${p.max}" step="${p.step}" value="${val}">
                 </div>`;
             }).join('');
-            return title + rows;
+            return title + canvas + rows;
         }).join('');
 
         return `
@@ -496,6 +500,100 @@
         ui.gainLbl.textContent = `${gainDb >= 0 ? '+' : ''}${gainDb.toFixed(1)} dB`;
 
         ui.btn.textContent = `${(gainDb + CONFIG.gainBias) >= 0 ? '+' : ''}${(gainDb + CONFIG.gainBias).toFixed(1)} dB`;
+        drawCurves(gainDb);
+    }
+
+    function drawCurves(curGain) {
+        if (!ui || ui.panel.style.display === 'none') return;
+        const cs = getComputedStyle(ui.panel);
+        const blue = cs.getPropertyValue('--agc-blue').trim();
+        const amber = cs.getPropertyValue('--agc-amber').trim();
+        const text = cs.getPropertyValue('--agc-text').trim();
+        const muted = cs.getPropertyValue('--agc-muted').trim();
+        const tick = cs.getPropertyValue('--agc-bar-bg').trim();
+        const green = cs.getPropertyValue('--agc-green').trim();
+
+        const chain = [...activeChains.values()][0];
+        if (!chain) return;
+
+        const curErr = Math.abs(CONFIG.targetLevel - chain.smoothedDb - chain.currentGain);
+
+        // --- Canvas 1: Level → Weight ---
+        const c1 = ui.canvasL;
+        if (!c1) return;
+        const ctx1 = c1.getContext('2d');
+        const W = c1.width, H = c1.height, P = 8;
+        ctx1.clearRect(0, 0, W, H);
+
+        // Axes
+        ctx1.strokeStyle = tick; ctx1.lineWidth = 0.5;
+        ctx1.beginPath(); ctx1.moveTo(P, H-P); ctx1.lineTo(W-P, H-P); ctx1.stroke();
+        ctx1.beginPath(); ctx1.moveTo(P, P); ctx1.lineTo(P, H-P); ctx1.stroke();
+
+        // Labels
+        ctx1.fillStyle = muted; ctx1.font = '8px sans-serif';
+        ctx1.fillText('-50', P, H-P-2);
+        ctx1.fillText('0 LKFS', W-P-28, H-P-2);
+        ctx1.fillText('steep^(x-base)', P+4, P+8);
+
+        // Curve
+        const pmax = CONFIG.maxGain - CONFIG.minGain;
+        ctx1.beginPath(); ctx1.strokeStyle = blue; ctx1.lineWidth = 1;
+        let first = true;
+        for (let px = 0; px <= 1; px += 0.005) {
+            const x = -50 + px * 50;
+            const w = Math.pow(CONFIG.levelSteep, x - CONFIG.levelBase);
+            const sx = P + px * (W - 2*P);
+            // Scale Y so that weight=pmax maps to top
+            const sy = H - P - Math.min(w / pmax, 1) * (H - 2*P);
+            if (first) { ctx1.moveTo(sx, sy); first = false; }
+            else ctx1.lineTo(sx, sy);
+        }
+        ctx1.stroke();
+
+        // Current point
+        if (chain.state === 'active') {
+            const outDb = chain.smoothedDb + curGain;
+            const curW = Math.pow(CONFIG.levelSteep, outDb - CONFIG.levelBase);
+            const cx = P + ((outDb + 50) / 50) * (W - 2*P);
+            const cy = H - P - Math.min(curW / pmax, 1) * (H - 2*P);
+            ctx1.fillStyle = green; ctx1.beginPath(); ctx1.arc(cx, cy, 3, 0, Math.PI*2); ctx1.fill();
+        }
+
+        // --- Canvas 2: Error → τ ---
+        const c2 = ui.canvasT, ctx2 = c2.getContext('2d');
+        ctx2.clearRect(0, 0, W, H);
+
+        ctx2.strokeStyle = tick; ctx2.lineWidth = 0.5;
+        ctx2.beginPath(); ctx2.moveTo(P, H-P); ctx2.lineTo(W-P, H-P); ctx2.stroke();
+        ctx2.beginPath(); ctx2.moveTo(P, P); ctx2.lineTo(P, H-P); ctx2.stroke();
+
+        ctx2.fillStyle = muted; ctx2.font = '8px sans-serif';
+        ctx2.fillText('0 dB', P, H-P-2);
+        const maxErr = Math.max(CONFIG.maxGain, Math.abs(CONFIG.minGain)) * 1.5;
+        ctx2.fillText(`${maxErr.toFixed(0)} dB`, W-P-16, H-P-2);
+        ctx2.fillText(`${CONFIG.tauBase.toFixed(0)}s`, P+4, P+8);
+
+        // Curve
+        ctx2.beginPath(); ctx2.strokeStyle = amber; ctx2.lineWidth = 1;
+        first = true;
+        for (let px = 0; px <= 1; px += 0.005) {
+            const e = px * maxErr;
+            const tau = Math.max(CONFIG.tauBase * Math.exp(-CONFIG.tauSteep * e), 0.01);
+            const sx = P + px * (W - 2*P);
+            const sy = H - P - (tau / CONFIG.tauBase) * (H - 2*P);
+            if (first) { ctx2.moveTo(sx, sy); first = false; }
+            else ctx2.lineTo(sx, sy);
+        }
+        ctx2.stroke();
+
+        // Current point
+        if (chain.state === 'active') {
+            const cx = P + (curErr / maxErr) * (W - 2*P);
+            const ctau = Math.max(CONFIG.tauBase * Math.exp(-CONFIG.tauSteep * curErr), 0.01);
+            const cy = H - P - (ctau / CONFIG.tauBase) * (H - 2*P);
+            ctx2.fillStyle = green; ctx2.beginPath(); ctx2.arc(cx, cy, 3, 0, Math.PI*2); ctx2.fill();
+        }
     }
 
     function updateUI() {
@@ -508,7 +606,7 @@
         ui.status.textContent = isEnabled ? '已启用' : '已禁用';
         ui.status.style.color = isEnabled ? 'var(--agc-green)' : 'var(--agc-red)';
 
-        ['targetLevel', 'maxGain', 'minGain', 'gainBias', 'rmsWindow', 'levelBase', 'levelScale', 'tauBase', 'tauSteep', 'initLevel'].forEach(key => {
+        ['targetLevel', 'maxGain', 'minGain', 'gainBias', 'rmsWindow', 'levelBase', 'levelSteep', 'tauBase', 'tauSteep', 'initLevel'].forEach(key => {
             const valEl = document.getElementById(`__vEqVal_${key}`);
             const range = document.getElementById(`__vEqRange_${key}`);
             if (valEl && range) {
