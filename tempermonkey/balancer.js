@@ -63,7 +63,7 @@
             this.current += (instant - this.current) * step;
 
             this.active = true;
-            this.gain.gain.value = Math.pow(10, (this.config.target - this.current) / 20);
+            this.gain.gain.value = gainEnabled ? Math.pow(10, (this.config.target - this.current) / 20) : 1;
         }
     }
 
@@ -146,7 +146,6 @@
         --agc-border: #d0d0d0;
         --agc-btn-hover: #f0f0f0;
         --agc-curve: #4a90d9;
-        --agc-origin: #c8a860;
         --agc-muted: #9494a8;
       }
       @media (prefers-color-scheme: dark) {
@@ -158,7 +157,6 @@
           --agc-border: #3a3a3a;
           --agc-btn-hover: #1a1a1a;
           --agc-curve: #7aa0d0;
-          --agc-origin: #c0a060;
           --agc-muted: #68687c;
         }
       }
@@ -215,8 +213,9 @@
         font-weight: bold;
         font-size: 15px;
       }
-      .__vAGCCount {
-        font-size: 12px;
+      #__vAGCCount {
+        font-weight: normal;
+        font-size: 10px;
         color: var(--agc-muted);
       }
       .__vAGCActions {
@@ -243,7 +242,10 @@
       .__vAGCActions button:hover {
         background: var(--agc-btn-hover);
       }
-      .__vAGCCanvas {
+      .__vAGCActions button.off {
+        color: var(--agc-muted);
+      }
+      #__vAGCCanvas {
         display: block;
         aspect-ratio: 16 / 9;
         margin-top: 12px;
@@ -256,8 +258,9 @@
       <div id="__vAGCButton">AGC</div>
       <div id="__vAGCPanel">
         <div class="__vAGCPanelHeader">
-          <span class="__vAGCTitle">音量平衡 <span id="__vAGCCount" class="__vAGCCount"></span></span>
+          <span class="__vAGCTitle">音量平衡 <span id="__vAGCCount"></span></span>
           <span class="__vAGCActions">
+            <button id="__vAGCGain" title="开关">⏻</button>
             <button id="__vAGCReset" title="重置">↺</button>
             <button id="__vAGCClose" title="关闭">×</button>
           </span>
@@ -267,6 +270,7 @@
     `;
 
     let ui = null;
+    let gainEnabled = true;
 
     function createUI() {
         if (ui) return;
@@ -284,9 +288,15 @@
             panel: document.getElementById('__vAGCPanel'),
             canvas: document.getElementById('__vAGCCanvas'),
             count: document.getElementById('__vAGCCount'),
+            gain: document.getElementById('__vAGCGain'),
             close: document.getElementById('__vAGCClose'),
             reset: document.getElementById('__vAGCReset'),
         };
+
+        ui.gain.addEventListener('click', () => {
+            gainEnabled = !gainEnabled;
+            ui.gain.classList.toggle('off', !gainEnabled);
+        });
 
         ui.btn.addEventListener('click', () => {
             const show = ui.panel.style.display !== 'flex';
@@ -305,14 +315,14 @@
         if (!ui || ui.panel.style.display !== 'flex') return;
         const canvas = ui.canvas;
 
+        const balancer = [...activeChains.values()].find(b => b.active);
+        if (!balancer) return;
+
         const dpr = window.devicePixelRatio || 1;
         const cssRect = canvas.getBoundingClientRect();
         if (cssRect.width <= 0 || cssRect.height <= 0) return;
         canvas.width = Math.floor(cssRect.width * dpr);
         canvas.height = Math.floor(cssRect.height * dpr);
-
-        const balancer = [...activeChains.values()].find(b => b.active);
-        if (!balancer) return;
 
         const width = cssRect.width, height = cssRect.height;
         const padding = 10;
@@ -349,7 +359,7 @@
 
         // weight curve
         ctx.beginPath();
-        ctx.strokeStyle = color('--agc-curve');
+        ctx.strokeStyle = gainEnabled ? color('--agc-curve') : color('--agc-border');
         ctx.lineWidth = 1.5;
         for (let i = 0; i <= limXNum; i++) {
             const loud = limXMin + (limXMax - limXMin) * i / limXNum;
@@ -363,38 +373,38 @@
         const point = balancer.instant - balancer.current + balancer.config.target;
         const pointX = toX(point);
         const pointY = toY(balancer.weight(point - balancer.config.target));
-        ctx.fillStyle = color('--agc-curve');
+        ctx.fillStyle = gainEnabled ? color('--agc-curve') : color('--agc-border');
         ctx.beginPath(); ctx.arc(pointX, pointY, 3, 0, Math.PI * 2); ctx.fill();
 
         // target loudness
         const targetX = toX(balancer.config.target);
-        ctx.strokeStyle = color('--agc-curve');
+        ctx.strokeStyle = gainEnabled ? color('--agc-curve') : color('--agc-border');
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(targetX, padding); ctx.lineTo(targetX, axisY); ctx.stroke();
 
         // target loudness label
         ctx.font = '10px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillStyle = color('--agc-curve');
+        ctx.fillStyle = gainEnabled ? color('--agc-curve') : color('--agc-border');
         ctx.fillText(balancer.config.target.toFixed(1), targetX, axisY + 12)
 
         // origin loudness
         const originX = toX(balancer.current);
-        ctx.strokeStyle = color('--agc-origin');
+        ctx.strokeStyle = gainEnabled ? color('--agc-border') : color('--agc-curve');
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(originX, padding); ctx.lineTo(originX, axisY); ctx.stroke();
 
         // origin loudness label
         ctx.font = '10px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillStyle = color('--agc-origin');
+        ctx.fillStyle = gainEnabled ? color('--agc-border') : color('--agc-curve');
         ctx.fillText(balancer.current.toFixed(1), originX, axisY + 12);
     }
 
     function updateVideoCount() {
         const total = activeChains.size;
         const active = [...activeChains.values()].filter(b => b.active).length;
-        ui.count.textContent = `${active}/${total} 个视频`;
+        ui.count.textContent = `${active} - ${total}`;
     }
 
     // Init //
