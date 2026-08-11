@@ -135,12 +135,147 @@
         return balancer;
     }
 
+    // UI //
+
+    const AGC_CSS = `
+      :root {
+        --agc-btn-bg: #ffffff;
+        --agc-btn-color: #1a1a1a;
+        --agc-panel-bg: #ffffff;
+        --agc-panel-color: #1a1a1a;
+        --agc-border: #d0d0d0;
+        --agc-btn-hover: #f0f0f0;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --agc-btn-bg: #000000;
+          --agc-btn-color: #f2f2f2;
+          --agc-panel-bg: #000000;
+          --agc-panel-color: #f2f2f2;
+          --agc-border: #3a3a3a;
+          --agc-btn-hover: #1a1a1a;
+        }
+      }
+      #__vAGCButton {
+        position: fixed;
+        z-index: 2147483647;
+        right: 20px;
+        bottom: 20px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: var(--agc-btn-bg);
+        color: var(--agc-btn-color);
+        border: 1px solid var(--agc-border);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: bold;
+        font-family: sans-serif;
+        user-select: none;
+        transition: background .2s;
+      }
+      #__vAGCButton:hover {
+        background: var(--agc-btn-hover);
+      }
+      #__vAGCPanel {
+        position: fixed;
+        z-index: 2147483647;
+        right: 20px;
+        bottom: 76px;
+        width: 300px;
+        background: var(--agc-panel-bg);
+        color: var(--agc-panel-color);
+        border: 1px solid var(--agc-border);
+        border-radius: 12px;
+        display: none;
+        padding: 16px;
+        font: 14px/1.5 sans-serif;
+        user-select: none;
+      }
+      .__vAGCPanelHeader {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--agc-border);
+      }
+      .__vAGCTitle {
+        font-weight: bold;
+        font-size: 15px;
+      }
+      .__vAGCActions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .__vAGCActions button {
+        background: none;
+        color: var(--agc-panel-color);
+        border: none;
+        border-radius: 50%;
+        width: 22px;
+        height: 22px;
+        font-size: 14px;
+        line-height: 1;
+        padding: 0;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background .2s;
+      }
+      .__vAGCActions button:hover {
+        background: var(--agc-btn-hover);
+      }
+    `;
+
+    const AGC_HTML = `
+      <div id="__vAGCButton">AGC</div>
+      <div id="__vAGCPanel">
+        <div class="__vAGCPanelHeader">
+          <span class="__vAGCTitle">音量平衡</span>
+          <span class="__vAGCActions">
+            <button id="__vAGCReset" title="重置">↺</button>
+            <button id="__vAGCClose" title="关闭">×</button>
+          </span>
+        </div>
+      </div>
+    `;
+
+    function createUI() {
+        if (document.getElementById('__vAGCButton')) return;
+
+        const style = document.createElement('style');
+        style.textContent = AGC_CSS;
+        document.head.appendChild(style);
+
+        const container = document.createElement('div');
+        container.innerHTML = AGC_HTML;
+        document.body.appendChild(container);
+
+        const btn = document.getElementById('__vAGCButton');
+        const panel = document.getElementById('__vAGCPanel');
+        btn.addEventListener('click', () => {
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        });
+
+        document.getElementById('__vAGCClose').addEventListener('click', () => {
+            panel.style.display = 'none';
+        });
+
+        document.getElementById('__vAGCReset').addEventListener('click', () => {});
+    }
+
     // Init //
 
     const CHAIN_LOOP_INTERVAL = 0.05;
     const SCAN_VIDEOS_INTERVAL = 5;
 
     function init() {
+        createUI();
         scanVideos();
         setInterval(scanVideos, SCAN_VIDEOS_INTERVAL * 1000);
         setInterval(chainLoop, CHAIN_LOOP_INTERVAL * 1000);
