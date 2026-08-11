@@ -35,8 +35,8 @@
             this.config = DEFAULTS;
             this.active = false;
             this.current = this.config.target;
+            this.instant = this.current;
             this.samples = new Float32Array(analyser.fftSize);
-            this.lastError = 0;
         }
 
         weight(error) {
@@ -51,23 +51,18 @@
                 sumSq += this.samples[i] * this.samples[i];
             }
 
+            if (sumSq < 1e-10) { return; }
+
             const rms = Math.sqrt(sumSq / this.samples.length);
             const instant = 20 * Math.log10(rms);
 
-            this.active ? this.effect(instant, dt) : this.detect(instant);
-        }
+            this.instant = instant;
 
-        detect(instant) {
-            if (instant > -60) this.active = true;
-        }
-
-        effect(instant, dt) {
             const error = instant - this.current;
-            this.lastError = error;
-
             const step = Math.max(Math.min(this.weight(error) * (1 - Math.exp(-dt)), 1), 0);
             this.current += (instant - this.current) * step;
 
+            this.active = true;
             this.gain.gain.value = Math.pow(10, (this.config.target - this.current) / 20);
         }
     }
@@ -133,7 +128,8 @@
         source.connect(shelf);
         shelf.connect(highpass);
         highpass.connect(analyser);
-        analyser.connect(gain);
+
+        source.connect(gain);
         gain.connect(ctx.destination);
 
         return balancer;
@@ -150,8 +146,8 @@
         --agc-border: #d0d0d0;
         --agc-btn-hover: #f0f0f0;
         --agc-curve: #4a90d9;
-        --agc-point: #50a070;
-        --agc-line: #c8a860;
+        --agc-origin: #c8a860;
+        --agc-muted: #9494a8;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -162,8 +158,8 @@
           --agc-border: #3a3a3a;
           --agc-btn-hover: #1a1a1a;
           --agc-curve: #7aa0d0;
-          --agc-point: #58b878;
-          --agc-line: #c0a060;
+          --agc-origin: #c0a060;
+          --agc-muted: #68687c;
         }
       }
       #__vAGCButton {
@@ -212,11 +208,16 @@
         justify-content: space-between;
         align-items: center;
         padding-bottom: 10px;
+        margin-bottom: 4px;
         border-bottom: 1px solid var(--agc-border);
       }
       .__vAGCTitle {
         font-weight: bold;
         font-size: 15px;
+      }
+      .__vAGCCount {
+        font-size: 12px;
+        color: var(--agc-muted);
       }
       .__vAGCActions {
         display: flex;
@@ -255,7 +256,7 @@
       <div id="__vAGCButton">AGC</div>
       <div id="__vAGCPanel">
         <div class="__vAGCPanelHeader">
-          <span class="__vAGCTitle">音量平衡</span>
+          <span class="__vAGCTitle">音量平衡 <span id="__vAGCCount" class="__vAGCCount"></span></span>
           <span class="__vAGCActions">
             <button id="__vAGCReset" title="重置">↺</button>
             <button id="__vAGCClose" title="关闭">×</button>
@@ -282,6 +283,7 @@
             btn: document.getElementById('__vAGCButton'),
             panel: document.getElementById('__vAGCPanel'),
             canvas: document.getElementById('__vAGCCanvas'),
+            count: document.getElementById('__vAGCCount'),
             close: document.getElementById('__vAGCClose'),
             reset: document.getElementById('__vAGCReset'),
         };
@@ -309,78 +311,95 @@
         canvas.width = Math.floor(cssRect.width * dpr);
         canvas.height = Math.floor(cssRect.height * dpr);
 
-        const W = cssRect.width, H = cssRect.height, P = 10;
-        const xAxisY = H - P - 16;
-        const ERR_MIN = -40, ERR_MAX = 20;
-        const N = 200;
-
         const balancer = [...activeChains.values()].find(b => b.active);
         if (!balancer) return;
 
+        const width = cssRect.width, height = cssRect.height;
+        const padding = 10;
+
+        const limXNum = 200;
+        const limXMid = balancer.current, limXHalf = 30;
+        const limXMin = limXMid - limXHalf, limXMax = limXMid + limXHalf;
+
+        const limYMax = 1.2;
+
+        const axisY = height - padding - 16;
+
         const cs = getComputedStyle(document.documentElement);
         const color = name => cs.getPropertyValue(name).trim();
-
-        const yMax = 1.2;
-        const pts = [];
-        for (let i = 0; i <= N; i++) {
-            const err = ERR_MIN + (ERR_MAX - ERR_MIN) * i / N;
-            pts.push([err, balancer.weight(err)]);
-        }
+        const toX = loud => padding + ((loud - limXMin) / (limXMax - limXMin)) * (width - 2 * padding);
+        const toY = weight => axisY - (weight / limYMax) * (axisY - padding);
 
         const ctx = canvas.getContext('2d');
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.clearRect(0, 0, W, H);
+        ctx.clearRect(0, 0, width, height);
 
+        // axis
         ctx.strokeStyle = color('--agc-border');
         ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(P, xAxisY); ctx.lineTo(W - P, xAxisY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(padding, axisY); ctx.lineTo(width - padding, axisY); ctx.stroke();
 
-        ctx.fillStyle = color('--agc-panel-color');
+        // axis label
+        ctx.fillStyle = color('--agc-border');
         ctx.font = '10px sans-serif';
-        ctx.fillText(String(ERR_MIN), P + 2, xAxisY - 3);
-        ctx.fillText(String(ERR_MAX), W - P - 24, xAxisY - 3);
+        ctx.textAlign = 'start';
+        ctx.fillText(limXMin.toFixed(1), padding + 2, axisY + 12);
+        ctx.textAlign = 'end';
+        ctx.fillText(limXMax.toFixed(1), width - padding - 2, axisY + 12);
 
+        // weight curve
         ctx.beginPath();
         ctx.strokeStyle = color('--agc-curve');
         ctx.lineWidth = 1.5;
-        for (let i = 0; i <= N; i++) {
-            const [err, w] = pts[i];
-            const x = P + ((err - ERR_MIN) / (ERR_MAX - ERR_MIN)) * (W - 2 * P);
-            const y = xAxisY - (w / yMax) * (xAxisY - P);
-            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        for (let i = 0; i <= limXNum; i++) {
+            const loud = limXMin + (limXMax - limXMin) * i / limXNum;
+            const loudX = toX(loud);
+            const loudY = toY(balancer.weight(loud - balancer.config.target));
+            i === 0 ? ctx.moveTo(loudX, loudY) : ctx.lineTo(loudX, loudY);
         }
         ctx.stroke();
 
-        const xZero = P + ((0 - ERR_MIN) / (ERR_MAX - ERR_MIN)) * (W - 2 * P);
-        ctx.strokeStyle = color('--agc-point');
-        ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(xZero, P); ctx.lineTo(xZero, xAxisY); ctx.stroke();
+        // weight curve point
+        const point = balancer.instant - balancer.current + balancer.config.target;
+        const pointX = toX(point);
+        const pointY = toY(balancer.weight(point - balancer.config.target));
+        ctx.fillStyle = color('--agc-curve');
+        ctx.beginPath(); ctx.arc(pointX, pointY, 3, 0, Math.PI * 2); ctx.fill();
 
-        const preErr = balancer.current - balancer.config.target;
-        const preX = P + ((preErr - ERR_MIN) / (ERR_MAX - ERR_MIN)) * (W - 2 * P);
-        ctx.strokeStyle = color('--agc-line');
+        // target loudness
+        const targetX = toX(balancer.config.target);
+        ctx.strokeStyle = color('--agc-curve');
         ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(preX, P); ctx.lineTo(preX, xAxisY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(targetX, padding); ctx.lineTo(targetX, axisY); ctx.stroke();
 
-        ctx.font = '9px sans-serif';
+        // target loudness label
+        ctx.font = '10px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillStyle = color('--agc-line');
-        ctx.fillText(balancer.current.toFixed(1), preX, P + 10);
-        ctx.fillStyle = color('--agc-point');
-        ctx.fillText(balancer.config.target.toFixed(1), xZero, xAxisY + 12);
-        ctx.textAlign = 'start';
+        ctx.fillStyle = color('--agc-curve');
+        ctx.fillText(balancer.config.target.toFixed(1), targetX, axisY + 12)
 
-        const err = balancer.lastError;
-        const w = balancer.weight(err);
-        const x = P + ((err - ERR_MIN) / (ERR_MAX - ERR_MIN)) * (W - 2 * P);
-        const y = xAxisY - (w / yMax) * (xAxisY - P);
-        ctx.fillStyle = color('--agc-point');
-        ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+        // origin loudness
+        const originX = toX(balancer.current);
+        ctx.strokeStyle = color('--agc-origin');
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(originX, padding); ctx.lineTo(originX, axisY); ctx.stroke();
+
+        // origin loudness label
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = color('--agc-origin');
+        ctx.fillText(balancer.current.toFixed(1), originX, axisY + 12);
+    }
+
+    function updateVideoCount() {
+        const total = activeChains.size;
+        const active = [...activeChains.values()].filter(b => b.active).length;
+        ui.count.textContent = `${active}/${total} 个视频`;
     }
 
     // Init //
 
-    const DRAW_CURVE_INTERVAL = 0.05;
+    const UI_REDRAW_INTERVAL = 0.05;
     const CHAIN_LOOP_INTERVAL = 0.05;
     const SCAN_VIDEOS_INTERVAL = 5;
 
@@ -389,7 +408,8 @@
         scanVideos();
         setInterval(scanVideos, SCAN_VIDEOS_INTERVAL * 1000);
         setInterval(chainLoop, CHAIN_LOOP_INTERVAL * 1000);
-        setInterval(drawCurve, DRAW_CURVE_INTERVAL * 1000);
+        setInterval(drawCurve, UI_REDRAW_INTERVAL * 1000);
+        setInterval(updateVideoCount, UI_REDRAW_INTERVAL * 1000);
     }
 
     function scanVideos() {
