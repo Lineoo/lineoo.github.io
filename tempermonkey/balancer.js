@@ -23,9 +23,9 @@
     const DEFAULTS = {
         enabled: true,
         target: -18,
-        steep: 1.1,
+        steep: 1.2,
         sigma: 5.0,
-        scale: 1.0,
+        scale: 0.05,
     };
 
     const STORE_KEY = '__agcConfig';
@@ -263,48 +263,63 @@
       .__vAGCActions button.off {
         color: var(--agc-muted);
       }
-      #__vAGCLevel {
+      .__vAGCSlider {
         -webkit-appearance: none;
         appearance: none;
         width: 100%;
-        margin-top: 12px;
         background: transparent;
       }
-      #__vAGCLevel::-webkit-slider-runnable-track {
-        height: 6px;
-        border-radius: 3px;
-        background: linear-gradient(to right, var(--agc-curve) var(--fill, 50%), var(--agc-muted) var(--fill, 50%));
+      .__vAGCSlider::-webkit-slider-runnable-track {
+        height: 8px;
+        border-radius: 4px;
+        border: 1px solid var(--agc-border);
+        background: linear-gradient(to right, var(--agc-curve) var(--fill, 50%), var(--agc-panel-bg) var(--fill, 50%));
       }
-      #__vAGCLevel::-moz-range-track {
-        height: 6px;
-        border-radius: 3px;
-        background: linear-gradient(to right, var(--agc-curve) var(--fill, 50%), var(--agc-muted) var(--fill, 50%));
+      .__vAGCSlider::-moz-range-track {
+        height: 8px;
+        border-radius: 4px;
+        border: 1px solid var(--agc-border);
+        background: linear-gradient(to right, var(--agc-curve) var(--fill, 50%), var(--agc-panel-bg) var(--fill, 50%));
       }
-      #__vAGCLevel::-webkit-slider-thumb {
+      .__vAGCSlider::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;
-        width: 16px;
-        height: 16px;
+        width: 18px;
+        height: 8px;
         margin-top: -5px;
-        border-radius: 50%;
-        background: var(--agc-panel-bg);
-        border: 1px solid var(--agc-border);
+        border-radius: 4px;
+        background: var(--agc-btn-hover);
+        border: none;
         cursor: pointer;
+        transition: background .2s;
       }
-      #__vAGCLevel::-moz-range-thumb {
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: var(--agc-panel-bg);
-        border: 1px solid var(--agc-border);
+      .__vAGCSlider::-moz-range-thumb {
+        width: 18px;
+        height: 8px;
+        border-radius: 4px;
+        background: var(--agc-btn-hover);
+        border: none;
         cursor: pointer;
+        transition: background .2s;
       }
-      #__vAGCCanvas {
+      .__vAGCSlider::-webkit-slider-thumb:hover {
+        background: var(--agc-muted);
+      }
+      .__vAGCSlider::-moz-range-thumb:hover {
+        background: var(--agc-muted);
+      }
+      .__vAGCCanvas {
         display: block;
         aspect-ratio: 16 / 9;
         margin-top: 12px;
         border-radius: 6px;
         border: 1px solid var(--agc-border);
+      }
+      .__vAGCSlider {
+        margin-top: 12px;
+      }
+      .__vAGCSlider + .__vAGCSlider {
+        margin-top: 4px;
       }
     `;
 
@@ -319,8 +334,11 @@
             <button id="__vAGCClose" title="关闭">×</button>
           </span>
         </div>
-        <canvas id="__vAGCCanvas"></canvas>
-        <input type="range" id="__vAGCLevel" min="-30" max="-10" step="0.5">
+        <canvas id="__vAGCCanvas" class="__vAGCCanvas"></canvas>
+        <input type="range" id="__vAGCLevel" class="__vAGCSlider" data-key="target" min="-30" max="-10" step="0.05">
+        <input type="range" id="__vAGCSteep" class="__vAGCSlider" data-key="steep" min="1.01" max="2.0" step="0.02">
+        <input type="range" id="__vAGCSigma" class="__vAGCSlider" data-key="sigma" min="1" max="30" step="0.5">
+        <input type="range" id="__vAGCScale" class="__vAGCSlider" data-key="scale" min="0.01" max="0.5" step="0.01">
       </div>
     `;
 
@@ -344,6 +362,9 @@
             count: document.getElementById('__vAGCCount'),
             gain: document.getElementById('__vAGCGain'),
             level: document.getElementById('__vAGCLevel'),
+            steep: document.getElementById('__vAGCSteep'),
+            sigma: document.getElementById('__vAGCSigma'),
+            scale: document.getElementById('__vAGCScale'),
             close: document.getElementById('__vAGCClose'),
             reset: document.getElementById('__vAGCReset'),
         };
@@ -351,23 +372,31 @@
         ui.gain.addEventListener('click', () => {
             CONFIG.enabled = !CONFIG.enabled;
             ui.gain.classList.toggle('off', !CONFIG.enabled);
-        });
-
-        ui.level.value = CONFIG.target;
-        const updateFill = () => {
-            const pct = (ui.level.value - ui.level.min) / (ui.level.max - ui.level.min) * 100;
-            ui.level.style.setProperty('--fill', pct + '%');
-        };
-        ui.level.addEventListener('input', () => {
-            CONFIG.target = parseFloat(ui.level.value);
-            updateFill();
-            drawCurve();
-        });
-        ui.level.addEventListener('change', () => {
-            updateFill();
             saveConfig();
         });
-        updateFill();
+
+        function wireParamSlider(input, key) {
+            input.value = CONFIG[key];
+            const updateFill = () => {
+                const pct = (input.value - input.min) / (input.max - input.min) * 100;
+                input.style.setProperty('--fill', pct + '%');
+            };
+            input.addEventListener('input', () => {
+                CONFIG[key] = parseFloat(input.value);
+                updateFill();
+                drawCurve();
+            });
+            input.addEventListener('change', () => {
+                updateFill();
+                saveConfig();
+            });
+            updateFill();
+        }
+
+        wireParamSlider(ui.level, 'target');
+        wireParamSlider(ui.steep, 'steep');
+        wireParamSlider(ui.sigma, 'sigma');
+        wireParamSlider(ui.scale, 'scale');
 
         ui.btn.addEventListener('click', () => {
             const show = ui.panel.style.display !== 'flex';
@@ -381,9 +410,12 @@
 
         ui.reset.addEventListener('click', () => {
             Object.assign(CONFIG, DEFAULTS);
-            ui.gain.classList.remove('off');
-            ui.level.value = CONFIG.target;
-            updateFill();
+            ui.gain.classList.toggle('off', !CONFIG.enabled);
+            for (const input of [ui.level, ui.steep, ui.sigma, ui.scale]) {
+                input.value = CONFIG[input.dataset.key];
+                const pct = (input.value - input.min) / (input.max - input.min) * 100;
+                input.style.setProperty('--fill', pct + '%');
+            }
             saveConfig();
             drawCurve();
         });
@@ -403,20 +435,21 @@
         canvas.height = Math.floor(cssRect.height * dpr);
 
         const width = cssRect.width, height = cssRect.height;
-        const padding = 10;
+        const wPadding = 10, hPadding = 20;
 
         const limXNum = 200;
-        const limXMid = CONFIG.enabled ? CONFIG.target : balancer.current, limXHalf = 30;
-        const limXMin = limXMid - limXHalf, limXMax = limXMid + limXHalf;
+        const limXMid = CONFIG.enabled ? CONFIG.target : balancer.current;
+        const limXMin = limXMid - 30, limXMax = limXMid + 20;
 
-        const limYMax = 1.2;
+        const limYMin = 0, limYMax = 0.1;
 
-        const axisY = height - padding - 16;
+        const axisXLen = width - 2 * wPadding, axisXMin = wPadding, axisXMax = width - wPadding;
+        const axisYLen = height - 2 * hPadding, axisYMin = height - hPadding, axisYMax = hPadding;
 
         const cs = getComputedStyle(document.documentElement);
         const color = name => cs.getPropertyValue(name).trim();
-        const toX = loud => padding + ((loud - limXMin) / (limXMax - limXMin)) * (width - 2 * padding);
-        const toY = weight => axisY - (weight / limYMax) * (axisY - padding);
+        const toX = loud => axisXMin + ((loud - limXMin) / (limXMax - limXMin)) * axisXLen;
+        const toY = weight => axisYMin - ((weight - limYMin) / (limYMax - limYMin)) * axisYLen;
 
         const ctx = canvas.getContext('2d');
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -435,22 +468,36 @@
             // axis
             ctx.strokeStyle = color;
             ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(padding, axisY); ctx.lineTo(width - padding, axisY); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(axisXMin, axisYMin); ctx.lineTo(axisXMax, axisYMin); ctx.stroke();
 
             // axis label
             ctx.fillStyle = color;
             ctx.font = '10px sans-serif';
             ctx.textAlign = 'start';
-            ctx.fillText(limXMin.toFixed(1), padding + 2, axisY + 12);
+            ctx.fillText(limXMin.toFixed(1), axisXMin + 2, axisYMin + 12);
             ctx.textAlign = 'end';
-            ctx.fillText(limXMax.toFixed(1), width - padding - 2, axisY + 12);
+            ctx.fillText(limXMax.toFixed(1), axisXMax - 2, axisYMin + 12);
+
+
+            // tau labels group
+            const drawTau = weight => {
+                const tauMax = Math.round(1 / Math.max(weight, 1e-6));
+                ctx.fillStyle = color;
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'end';
+                ctx.fillText(`${tauMax} s`, axisXMax - 2, toY(weight) - 5);
+            };
+
+            drawTau(0.1);
+            drawTau(0.05);
+            drawTau(0.01);
         }
 
         function drawBalanced(color) {
             // weight curve
             ctx.beginPath();
             ctx.strokeStyle = color;
-            ctx.lineWidth = 1.5;
+            ctx.lineWidth = 1;
             for (let i = 0; i <= limXNum; i++) {
                 const loud = limXMin + (limXMax - limXMin) * i / limXNum;
                 const loudX = toX(loud);
@@ -466,17 +513,24 @@
             ctx.fillStyle = color;
             ctx.beginPath(); ctx.arc(pointX, pointY, 3, 0, Math.PI * 2); ctx.fill();
 
+            // weight curve point label
+            const tau = Math.round(1 / Math.max(balancer.weight(point - CONFIG.target), 1e-6));
+            ctx.font = '10px sans-serif';
+            ctx.fillStyle = color;
+            ctx.textAlign = 'end';
+            ctx.fillText(tau > 360 ? "- s" : `${tau} s`, axisXMax - 2, pointY - 5);
+
             // target loudness
             const targetX = toX(CONFIG.target);
             ctx.strokeStyle = color;
             ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(targetX, padding); ctx.lineTo(targetX, axisY); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(targetX, axisYMax); ctx.lineTo(targetX, axisYMin); ctx.stroke();
 
             // target loudness label
             ctx.font = '10px sans-serif';
             ctx.textAlign = 'center';
             ctx.fillStyle = color;
-            ctx.fillText(CONFIG.target.toFixed(1), targetX, axisY + 12);
+            ctx.fillText(CONFIG.target.toFixed(1), targetX, axisYMin + 12);
         }
 
         function drawOrigin(color) {
@@ -484,13 +538,13 @@
             const originX = toX(balancer.current);
             ctx.strokeStyle = color;
             ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(originX, padding); ctx.lineTo(originX, axisY); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(originX, axisYMax); ctx.lineTo(originX, axisYMin); ctx.stroke();
 
             // origin loudness label
             ctx.font = '10px sans-serif';
             ctx.textAlign = 'center';
             ctx.fillStyle = color;
-            ctx.fillText(balancer.current.toFixed(1), originX, padding - 2);
+            ctx.fillText(balancer.current.toFixed(1), originX, axisYMax - 2);
         }
     }
 
