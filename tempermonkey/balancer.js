@@ -57,12 +57,13 @@
             const instant = 20 * Math.log10(rms);
 
             this.instant = instant;
+            this.active = true;
+            ui.btn.style.display = 'flex';
 
             const error = instant - this.current;
             const step = Math.max(Math.min(this.weight(error) * (1 - Math.exp(-dt)), 1), 0);
             this.current += (instant - this.current) * step;
 
-            this.active = true;
             this.gain.gain.value = gainEnabled ? Math.pow(10, (this.config.target - this.current) / 20) : 1;
         }
     }
@@ -172,7 +173,7 @@
         color: var(--agc-btn-color);
         border: 1px solid var(--agc-border);
         cursor: pointer;
-        display: flex;
+        display: none;
         align-items: center;
         justify-content: center;
         font-size: 10px;
@@ -250,7 +251,7 @@
         aspect-ratio: 16 / 9;
         margin-top: 12px;
         border-radius: 6px;
-        background: var(--agc-btn-hover);
+        border: 1px solid var(--agc-border);
       }
     `;
 
@@ -328,7 +329,7 @@
         const padding = 10;
 
         const limXNum = 200;
-        const limXMid = balancer.current, limXHalf = 30;
+        const limXMid = gainEnabled ? balancer.config.target : balancer.current, limXHalf = 30;
         const limXMin = limXMid - limXHalf, limXMax = limXMid + limXHalf;
 
         const limYMax = 1.2;
