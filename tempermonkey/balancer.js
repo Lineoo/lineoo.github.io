@@ -21,26 +21,44 @@
     'use strict';
 
     const DEFAULTS = {
+        enabled: true,
         target: -18,
         steep: 1.1,
         sigma: 5.0,
         scale: 1.0,
     };
 
+    const STORE_KEY = '__agcConfig';
+    let CONFIG = Object.assign({}, DEFAULTS);
+
+    function loadConfig() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(STORE_KEY));
+            if (saved && typeof saved === 'object') Object.assign(CONFIG, saved);
+        } catch (e) { }
+    }
+
+    function saveConfig() {
+        try {
+            localStorage.setItem(STORE_KEY, JSON.stringify(CONFIG));
+        } catch (e) { }
+    }
+
+    loadConfig();
+
     class AGCBalancer {
         constructor(source, analyser, gain) {
             this.source = source;
             this.analyser = analyser;
             this.gain = gain;
-            this.config = DEFAULTS;
             this.active = false;
-            this.current = this.config.target;
+            this.current = CONFIG.target;
             this.instant = this.current;
             this.samples = new Float32Array(analyser.fftSize);
         }
 
         weight(error) {
-            const { scale, steep, sigma } = this.config;
+            const { scale, steep, sigma } = CONFIG;
             return scale * Math.pow(steep, error) * (1 - Math.exp(-(error * error) / (2 * sigma * sigma)));
         }
 
@@ -64,7 +82,7 @@
             const step = Math.max(Math.min(this.weight(error) * (1 - Math.exp(-dt)), 1), 0);
             this.current += (instant - this.current) * step;
 
-            this.gain.gain.value = gainEnabled ? Math.pow(10, (this.config.target - this.current) / 20) : 1;
+            this.gain.gain.value = CONFIG.enabled ? Math.pow(10, (CONFIG.target - this.current) / 20) : 1;
         }
     }
 
@@ -207,7 +225,6 @@
         justify-content: space-between;
         align-items: center;
         padding-bottom: 10px;
-        margin-bottom: 4px;
         border-bottom: 1px solid var(--agc-border);
       }
       .__vAGCTitle {
@@ -246,6 +263,42 @@
       .__vAGCActions button.off {
         color: var(--agc-muted);
       }
+      #__vAGCLevel {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        margin-top: 12px;
+        background: transparent;
+      }
+      #__vAGCLevel::-webkit-slider-runnable-track {
+        height: 6px;
+        border-radius: 3px;
+        background: linear-gradient(to right, var(--agc-curve) var(--fill, 50%), var(--agc-muted) var(--fill, 50%));
+      }
+      #__vAGCLevel::-moz-range-track {
+        height: 6px;
+        border-radius: 3px;
+        background: linear-gradient(to right, var(--agc-curve) var(--fill, 50%), var(--agc-muted) var(--fill, 50%));
+      }
+      #__vAGCLevel::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        margin-top: -5px;
+        border-radius: 50%;
+        background: var(--agc-panel-bg);
+        border: 1px solid var(--agc-border);
+        cursor: pointer;
+      }
+      #__vAGCLevel::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--agc-panel-bg);
+        border: 1px solid var(--agc-border);
+        cursor: pointer;
+      }
       #__vAGCCanvas {
         display: block;
         aspect-ratio: 16 / 9;
@@ -267,11 +320,11 @@
           </span>
         </div>
         <canvas id="__vAGCCanvas"></canvas>
+        <input type="range" id="__vAGCLevel" min="-30" max="-10" step="0.5">
       </div>
     `;
 
     let ui = null;
-    let gainEnabled = true;
 
     function createUI() {
         if (ui) return;
@@ -290,14 +343,31 @@
             canvas: document.getElementById('__vAGCCanvas'),
             count: document.getElementById('__vAGCCount'),
             gain: document.getElementById('__vAGCGain'),
+            level: document.getElementById('__vAGCLevel'),
             close: document.getElementById('__vAGCClose'),
             reset: document.getElementById('__vAGCReset'),
         };
 
         ui.gain.addEventListener('click', () => {
-            gainEnabled = !gainEnabled;
-            ui.gain.classList.toggle('off', !gainEnabled);
+            CONFIG.enabled = !CONFIG.enabled;
+            ui.gain.classList.toggle('off', !CONFIG.enabled);
         });
+
+        ui.level.value = CONFIG.target;
+        const updateFill = () => {
+            const pct = (ui.level.value - ui.level.min) / (ui.level.max - ui.level.min) * 100;
+            ui.level.style.setProperty('--fill', pct + '%');
+        };
+        ui.level.addEventListener('input', () => {
+            CONFIG.target = parseFloat(ui.level.value);
+            updateFill();
+            drawCurve();
+        });
+        ui.level.addEventListener('change', () => {
+            updateFill();
+            saveConfig();
+        });
+        updateFill();
 
         ui.btn.addEventListener('click', () => {
             const show = ui.panel.style.display !== 'flex';
@@ -309,7 +379,14 @@
             ui.panel.style.display = 'none';
         });
 
-        ui.reset.addEventListener('click', () => { });
+        ui.reset.addEventListener('click', () => {
+            Object.assign(CONFIG, DEFAULTS);
+            ui.gain.classList.remove('off');
+            ui.level.value = CONFIG.target;
+            updateFill();
+            saveConfig();
+            drawCurve();
+        });
     }
 
     function drawCurve() {
@@ -329,7 +406,7 @@
         const padding = 10;
 
         const limXNum = 200;
-        const limXMid = gainEnabled ? balancer.config.target : balancer.current, limXHalf = 30;
+        const limXMid = CONFIG.enabled ? CONFIG.target : balancer.current, limXHalf = 30;
         const limXMin = limXMid - limXHalf, limXMax = limXMid + limXHalf;
 
         const limYMax = 1.2;
@@ -345,61 +422,76 @@
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, width, height);
 
-        // axis
-        ctx.strokeStyle = color('--agc-border');
-        ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(padding, axisY); ctx.lineTo(width - padding, axisY); ctx.stroke();
-
-        // axis label
-        ctx.fillStyle = color('--agc-border');
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'start';
-        ctx.fillText(limXMin.toFixed(1), padding + 2, axisY + 12);
-        ctx.textAlign = 'end';
-        ctx.fillText(limXMax.toFixed(1), width - padding - 2, axisY + 12);
-
-        // weight curve
-        ctx.beginPath();
-        ctx.strokeStyle = gainEnabled ? color('--agc-curve') : color('--agc-border');
-        ctx.lineWidth = 1.5;
-        for (let i = 0; i <= limXNum; i++) {
-            const loud = limXMin + (limXMax - limXMin) * i / limXNum;
-            const loudX = toX(loud);
-            const loudY = toY(balancer.weight(loud - balancer.config.target));
-            i === 0 ? ctx.moveTo(loudX, loudY) : ctx.lineTo(loudX, loudY);
+        drawAxis(color('--agc-border'));
+        if (CONFIG.enabled) {
+            drawOrigin(color('--agc-border'));
+            drawBalanced(color('--agc-curve'));
+        } else {
+            drawBalanced(color('--agc-border'));
+            drawOrigin(color('--agc-curve'));
         }
-        ctx.stroke();
 
-        // weight curve point
-        const point = balancer.instant - balancer.current + balancer.config.target;
-        const pointX = toX(point);
-        const pointY = toY(balancer.weight(point - balancer.config.target));
-        ctx.fillStyle = gainEnabled ? color('--agc-curve') : color('--agc-border');
-        ctx.beginPath(); ctx.arc(pointX, pointY, 3, 0, Math.PI * 2); ctx.fill();
+        function drawAxis(color) {
+            // axis
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(padding, axisY); ctx.lineTo(width - padding, axisY); ctx.stroke();
 
-        // target loudness
-        const targetX = toX(balancer.config.target);
-        ctx.strokeStyle = gainEnabled ? color('--agc-curve') : color('--agc-border');
-        ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(targetX, padding); ctx.lineTo(targetX, axisY); ctx.stroke();
+            // axis label
+            ctx.fillStyle = color;
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'start';
+            ctx.fillText(limXMin.toFixed(1), padding + 2, axisY + 12);
+            ctx.textAlign = 'end';
+            ctx.fillText(limXMax.toFixed(1), width - padding - 2, axisY + 12);
+        }
 
-        // target loudness label
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = gainEnabled ? color('--agc-curve') : color('--agc-border');
-        ctx.fillText(balancer.config.target.toFixed(1), targetX, axisY + 12)
+        function drawBalanced(color) {
+            // weight curve
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            for (let i = 0; i <= limXNum; i++) {
+                const loud = limXMin + (limXMax - limXMin) * i / limXNum;
+                const loudX = toX(loud);
+                const loudY = toY(balancer.weight(loud - CONFIG.target));
+                i === 0 ? ctx.moveTo(loudX, loudY) : ctx.lineTo(loudX, loudY);
+            }
+            ctx.stroke();
 
-        // origin loudness
-        const originX = toX(balancer.current);
-        ctx.strokeStyle = gainEnabled ? color('--agc-border') : color('--agc-curve');
-        ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(originX, padding); ctx.lineTo(originX, axisY); ctx.stroke();
+            // weight curve point
+            const point = balancer.instant - balancer.current + CONFIG.target;
+            const pointX = toX(point);
+            const pointY = toY(balancer.weight(point - CONFIG.target));
+            ctx.fillStyle = color;
+            ctx.beginPath(); ctx.arc(pointX, pointY, 3, 0, Math.PI * 2); ctx.fill();
 
-        // origin loudness label
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = gainEnabled ? color('--agc-border') : color('--agc-curve');
-        ctx.fillText(balancer.current.toFixed(1), originX, axisY + 12);
+            // target loudness
+            const targetX = toX(CONFIG.target);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(targetX, padding); ctx.lineTo(targetX, axisY); ctx.stroke();
+
+            // target loudness label
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = color;
+            ctx.fillText(CONFIG.target.toFixed(1), targetX, axisY + 12);
+        }
+
+        function drawOrigin(color) {
+            // origin loudness
+            const originX = toX(balancer.current);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(originX, padding); ctx.lineTo(originX, axisY); ctx.stroke();
+
+            // origin loudness label
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = color;
+            ctx.fillText(balancer.current.toFixed(1), originX, padding - 2);
+        }
     }
 
     function updateVideoCount() {
