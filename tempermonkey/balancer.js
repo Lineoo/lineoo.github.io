@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         自动音量均衡器 (AGC 核心算法)
+// @name         音量均衡器
 // @namespace    http://tampermonkey.net/
-// @version      0.1
-// @description  AGC 动态音量归一化核心算法模块（无 UI）
-// @author       You
+// @version      1.0
+// @description  AGC 动态音量归一化
+// @author       Lineoo
 // @match        *://*.bilibili.com/*
 // @match        *://*.youtube.com/*
 // @match        *://*.iqiyi.com/*
