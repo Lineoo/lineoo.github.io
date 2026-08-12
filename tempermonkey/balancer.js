@@ -8,7 +8,7 @@
 // @match        *://*.youtube.com/*
 // @match        *://*.iqiyi.com/*
 // @match        *://*.youku.com/*
-// @match        *://*.v.qq.com/*
+// @match        *://*.curveV.qq.com/*
 // @match        *://*.acfun.cn/*
 // @match        *://*.mgtv.com/*
 // @match        *://*.ixigua.com/*
@@ -23,9 +23,9 @@
     const DEFAULTS = {
         enabled: true,
         target: -18,
-        u: -18,
-        v: 0.02,
-        w: 0.1,
+        curveU: -18,
+        curveV: 0.03,
+        curveW: 0.2,
     };
 
     const STORE_KEY = '__agcConfig';
@@ -58,7 +58,7 @@
         }
 
         weight(error) {
-            const { u, v, w } = CONFIG;
+            const { curveU: u, curveV: v, curveW: w } = CONFIG;
             return 2 * v * Math.exp(w * (error - u)) * (1 - Math.pow(2, -(error * error) / (u * u)));
         }
 
@@ -161,24 +161,24 @@
 
     const AGC_CSS = `
       :root {
-        --agc-btn-bg: #ffffff;
-        --agc-btn-color: #1a1a1a;
-        --agc-panel-bg: #ffffff;
-        --agc-panel-color: #1a1a1a;
+        --agc-bg: #ffffff;
+        --agc-color: #1a1a1a;
         --agc-border: #d0d0d0;
-        --agc-btn-hover: #f0f0f0;
+        --agc-hover: #f0f0f0;
         --agc-curve: #4a90d9;
+        --agc-level: #9acbff;
+        --agc-param: #ffd482;
         --agc-muted: #9494a8;
       }
       @media (prefers-color-scheme: dark) {
         :root {
-          --agc-btn-bg: #000000;
-          --agc-btn-color: #f2f2f2;
-          --agc-panel-bg: #000000;
-          --agc-panel-color: #f2f2f2;
-          --agc-border: #3a3a3a;
-          --agc-btn-hover: #1a1a1a;
+          --agc-bg: #000000;
+          --agc-color: #f2f2f2;
+          --agc-border: #595959;
+          --agc-hover: #1a1a1a;
           --agc-curve: #7aa0d0;
+          --agc-level: #1c62ad;
+          --agc-param: #aa7001;
           --agc-muted: #68687c;
         }
       }
@@ -190,8 +190,8 @@
         width: 44px;
         height: 44px;
         border-radius: 50%;
-        background: var(--agc-btn-bg);
-        color: var(--agc-btn-color);
+        background: var(--agc-bg);
+        color: var(--agc-color);
         border: 1px solid var(--agc-border);
         cursor: pointer;
         display: none;
@@ -204,7 +204,7 @@
         transition: background .2s;
       }
       #__vAGCButton:hover {
-        background: var(--agc-btn-hover);
+        background: var(--agc-hover);
       }
       #__vAGCPanel {
         display: flex;
@@ -214,8 +214,8 @@
         right: 20px;
         bottom: 76px;
         width: 300px;
-        background: var(--agc-panel-bg);
-        color: var(--agc-panel-color);
+        background: var(--agc-bg);
+        color: var(--agc-color);
         border: 1px solid var(--agc-border);
         border-radius: 12px;
         display: none;
@@ -246,7 +246,7 @@
       }
       .__vAGCActions button {
         background: none;
-        color: var(--agc-panel-color);
+        color: var(--agc-color);
         border: none;
         border-radius: 50%;
         width: 22px;
@@ -261,7 +261,7 @@
         transition: background .2s;
       }
       .__vAGCActions button:hover {
-        background: var(--agc-btn-hover);
+        background: var(--agc-hover);
       }
       .__vAGCActions button.off {
         color: var(--agc-muted);
@@ -275,14 +275,18 @@
       .__vAGCSlider::-webkit-slider-runnable-track {
         height: 8px;
         border-radius: 4px;
-        border: 1px solid var(--agc-border);
-        background: linear-gradient(to right, var(--agc-curve) var(--fill, 50%), var(--agc-panel-bg) var(--fill, 50%));
+        background: linear-gradient(to right, var(--agc-level) var(--fill, 50%), var(--agc-hover) var(--fill, 50%));
       }
       .__vAGCSlider::-moz-range-track {
         height: 8px;
         border-radius: 4px;
-        border: 1px solid var(--agc-border);
-        background: linear-gradient(to right, var(--agc-curve) var(--fill, 50%), var(--agc-panel-bg) var(--fill, 50%));
+        background: linear-gradient(to right, var(--agc-level) var(--fill, 50%), var(--agc-hover) var(--fill, 50%));
+      }
+      .__vAGCSlider.__vAGCCurve::-webkit-slider-runnable-track {
+        background: linear-gradient(to right, var(--agc-param) var(--fill, 50%), var(--agc-hover) var(--fill, 50%));
+      }
+      .__vAGCSlider.__vAGCCurve::-moz-range-track {
+        background: linear-gradient(to right, var(--agc-param) var(--fill, 50%), var(--agc-hover) var(--fill, 50%));
       }
       .__vAGCSlider::-webkit-slider-thumb {
         -webkit-appearance: none;
@@ -291,7 +295,7 @@
         height: 8px;
         margin-top: -5px;
         border-radius: 4px;
-        background: var(--agc-btn-hover);
+        background: var(--agc-color);
         border: none;
         cursor: pointer;
         transition: background .2s;
@@ -300,7 +304,7 @@
         width: 18px;
         height: 8px;
         border-radius: 4px;
-        background: var(--agc-btn-hover);
+        background: var(--agc-color);
         border: none;
         cursor: pointer;
         transition: background .2s;
@@ -339,9 +343,9 @@
         </div>
         <canvas id="__vAGCCanvas" class="__vAGCCanvas"></canvas>
         <input type="range" id="__vAGCLevel" class="__vAGCSlider" data-key="target" min="-30" max="-10" step="0.001">
-        <input type="range" id="__vAGCCurveU" class="__vAGCSlider" data-key="u" min="-40" max="-1" step="0.001">
-        <input type="range" id="__vAGCCurveV" class="__vAGCSlider" data-key="v" min="0.001" max="0.1" step="0.001">
-        <input type="range" id="__vAGCCurveW" class="__vAGCSlider" data-key="w" min="0.05" max="0.1" step="0.001">
+        <input type="range" id="__vAGCCurveU" class="__vAGCSlider __vAGCCurve" data-key="curveU" min="-40" max="-1" step="0.001">
+        <input type="range" id="__vAGCCurveV" class="__vAGCSlider __vAGCCurve" data-key="curveV" min="0.001" max="0.1" step="0.001">
+        <input type="range" id="__vAGCCurveW" class="__vAGCSlider __vAGCCurve" data-key="curveW" min="0.05" max="0.3" step="0.001">
       </div>
     `;
 
@@ -480,6 +484,12 @@
             ctx.textAlign = 'end';
             ctx.fillText(limXMax.toFixed(1), axisXMax - 2, axisYMin + 12);
 
+            // weight curve standard point
+            const std = CONFIG.target + CONFIG.curveU;
+            const stdX = toX(std);
+            const stdY = toY(balancer.weight(std - CONFIG.target));
+            ctx.fillStyle = color;
+            ctx.beginPath(); ctx.arc(stdX, stdY, 3, 0, Math.PI * 2); ctx.fill();
 
             // tau labels group
             const drawTau = weight => {
@@ -514,13 +524,6 @@
             const pointY = toY(balancer.weight(point - CONFIG.target));
             ctx.fillStyle = color;
             ctx.beginPath(); ctx.arc(pointX, pointY, 3, 0, Math.PI * 2); ctx.fill();
-
-            // weight curve standard point
-            const std = CONFIG.target + CONFIG.u;
-            const stdX = toX(std);
-            const stdY = toY(balancer.weight(std - CONFIG.target));
-            ctx.fillStyle = color;
-            ctx.beginPath(); ctx.arc(stdX, stdY, 3, 0, Math.PI * 2); ctx.fill();
 
             // weight curve point label
             const tau = Math.round(1 / Math.max(balancer.weight(point - CONFIG.target), 1e-6));
