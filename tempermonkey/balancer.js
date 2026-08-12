@@ -23,9 +23,9 @@
     const DEFAULTS = {
         enabled: true,
         target: -18,
-        steep: 1.2,
-        sigma: 5.0,
-        scale: 0.05,
+        u: -18,
+        v: 0.02,
+        w: 0.1,
     };
 
     const STORE_KEY = '__agcConfig';
@@ -58,8 +58,8 @@
         }
 
         weight(error) {
-            const { scale, steep, sigma } = CONFIG;
-            return scale * Math.pow(steep, error) * (1 - Math.exp(-(error * error) / (2 * sigma * sigma)));
+            const { u, v, w } = CONFIG;
+            return 2 * v * Math.exp(w * (error - u)) * (1 - Math.pow(2, -(error * error) / (u * u)));
         }
 
         process(dt) {
@@ -122,7 +122,10 @@
 
         video.addEventListener('emptied', () => {
             const balancer = activeChains.get(video);
-            if (balancer) activeChains.set(video, new AGCBalancer(balancer.analyser, balancer.gainNode));
+            if (!balancer) return;
+            balancer.active = false;
+            balancer.current = CONFIG.target;
+            balancer.instant = balancer.current;
         });
 
         console.log('AGC: 已捕获视频', video);
@@ -195,7 +198,7 @@
         align-items: center;
         justify-content: center;
         font-size: 10px;
-        font-weight: bold;
+        font-weight: normal;
         font-family: sans-serif;
         user-select: none;
         transition: background .2s;
@@ -335,10 +338,10 @@
           </span>
         </div>
         <canvas id="__vAGCCanvas" class="__vAGCCanvas"></canvas>
-        <input type="range" id="__vAGCLevel" class="__vAGCSlider" data-key="target" min="-30" max="-10" step="0.05">
-        <input type="range" id="__vAGCSteep" class="__vAGCSlider" data-key="steep" min="1.01" max="2.0" step="0.02">
-        <input type="range" id="__vAGCSigma" class="__vAGCSlider" data-key="sigma" min="1" max="30" step="0.5">
-        <input type="range" id="__vAGCScale" class="__vAGCSlider" data-key="scale" min="0.01" max="0.5" step="0.01">
+        <input type="range" id="__vAGCLevel" class="__vAGCSlider" data-key="target" min="-30" max="-10" step="0.001">
+        <input type="range" id="__vAGCCurveU" class="__vAGCSlider" data-key="u" min="-40" max="-1" step="0.001">
+        <input type="range" id="__vAGCCurveV" class="__vAGCSlider" data-key="v" min="0.001" max="0.1" step="0.001">
+        <input type="range" id="__vAGCCurveW" class="__vAGCSlider" data-key="w" min="0.05" max="0.1" step="0.001">
       </div>
     `;
 
@@ -362,9 +365,9 @@
             count: document.getElementById('__vAGCCount'),
             gain: document.getElementById('__vAGCGain'),
             level: document.getElementById('__vAGCLevel'),
-            steep: document.getElementById('__vAGCSteep'),
-            sigma: document.getElementById('__vAGCSigma'),
-            scale: document.getElementById('__vAGCScale'),
+            curveU: document.getElementById('__vAGCCurveU'),
+            curveV: document.getElementById('__vAGCCurveV'),
+            curveW: document.getElementById('__vAGCCurveW'),
             close: document.getElementById('__vAGCClose'),
             reset: document.getElementById('__vAGCReset'),
         };
@@ -376,13 +379,13 @@
         });
 
         function wireParamSlider(input, key) {
-            input.value = CONFIG[key];
+            input.value = CONFIG[input.dataset.key];
             const updateFill = () => {
                 const pct = (input.value - input.min) / (input.max - input.min) * 100;
                 input.style.setProperty('--fill', pct + '%');
             };
             input.addEventListener('input', () => {
-                CONFIG[key] = parseFloat(input.value);
+                CONFIG[input.dataset.key] = parseFloat(input.value);
                 updateFill();
                 drawCurve();
             });
@@ -393,10 +396,10 @@
             updateFill();
         }
 
-        wireParamSlider(ui.level, 'target');
-        wireParamSlider(ui.steep, 'steep');
-        wireParamSlider(ui.sigma, 'sigma');
-        wireParamSlider(ui.scale, 'scale');
+        wireParamSlider(ui.level);
+        wireParamSlider(ui.curveU);
+        wireParamSlider(ui.curveV);
+        wireParamSlider(ui.curveW);
 
         ui.btn.addEventListener('click', () => {
             const show = ui.panel.style.display !== 'flex';
@@ -411,7 +414,7 @@
         ui.reset.addEventListener('click', () => {
             Object.assign(CONFIG, DEFAULTS);
             ui.gain.classList.toggle('off', !CONFIG.enabled);
-            for (const input of [ui.level, ui.steep, ui.sigma, ui.scale]) {
+            for (const input of [ui.level, ui.curveU, ui.curveV, ui.curveW]) {
                 input.value = CONFIG[input.dataset.key];
                 const pct = (input.value - input.min) / (input.max - input.min) * 100;
                 input.style.setProperty('--fill', pct + '%');
@@ -422,7 +425,6 @@
     }
 
     function drawCurve() {
-        if (!ui || ui.panel.style.display !== 'flex') return;
         const canvas = ui.canvas;
 
         const balancer = [...activeChains.values()].find(b => b.active);
@@ -513,6 +515,13 @@
             ctx.fillStyle = color;
             ctx.beginPath(); ctx.arc(pointX, pointY, 3, 0, Math.PI * 2); ctx.fill();
 
+            // weight curve standard point
+            const std = CONFIG.target + CONFIG.u;
+            const stdX = toX(std);
+            const stdY = toY(balancer.weight(std - CONFIG.target));
+            ctx.fillStyle = color;
+            ctx.beginPath(); ctx.arc(stdX, stdY, 3, 0, Math.PI * 2); ctx.fill();
+
             // weight curve point label
             const tau = Math.round(1 / Math.max(balancer.weight(point - CONFIG.target), 1e-6));
             ctx.font = '10px sans-serif';
@@ -530,7 +539,7 @@
             ctx.font = '10px sans-serif';
             ctx.textAlign = 'center';
             ctx.fillStyle = color;
-            ctx.fillText(CONFIG.target.toFixed(1), targetX, axisYMin + 12);
+            ctx.fillText(`${CONFIG.target.toFixed(1)} LUFS`, targetX, axisYMin + 12);
         }
 
         function drawOrigin(color) {
@@ -544,14 +553,22 @@
             ctx.font = '10px sans-serif';
             ctx.textAlign = 'center';
             ctx.fillStyle = color;
-            ctx.fillText(balancer.current.toFixed(1), originX, axisYMax - 2);
+            ctx.fillText(`${balancer.current.toFixed(1)} LUFS`, originX, axisYMax - 2);
         }
     }
 
-    function updateVideoCount() {
+    function updatePanelContent() {
         const total = activeChains.size;
         const active = [...activeChains.values()].filter(b => b.active).length;
-        ui.count.textContent = `${active} - ${total}`;
+        ui.count.textContent = `  活动 ${active} | 全部 ${total}`;
+    }
+
+    function updateButtonContent() {
+        const balancer = [...activeChains.values()].find(b => b.active);
+        if (!balancer) return;
+
+        const gain = CONFIG.target - balancer.current;
+        ui.btn.textContent = `${gain >= 0 ? '+' : ''}${gain.toFixed(1)} db`;
     }
 
     // Init //
@@ -565,8 +582,7 @@
         scanVideos();
         setInterval(scanVideos, SCAN_VIDEOS_INTERVAL * 1000);
         setInterval(chainLoop, CHAIN_LOOP_INTERVAL * 1000);
-        setInterval(drawCurve, UI_REDRAW_INTERVAL * 1000);
-        setInterval(updateVideoCount, UI_REDRAW_INTERVAL * 1000);
+        setInterval(uiRedraw, UI_REDRAW_INTERVAL * 1000);
     }
 
     function scanVideos() {
@@ -585,6 +601,14 @@
                 balancer.process(CHAIN_LOOP_INTERVAL);
             } catch (e) { }
         }
+    }
+
+    function uiRedraw() {
+        if (!ui) return;
+        updateButtonContent()
+        if (ui.panel.style.display !== 'flex') return;
+        drawCurve()
+        updatePanelContent()
     }
 
     if (document.readyState === 'loading') {
