@@ -13,6 +13,12 @@
     <div class="header">
       <h1 class="title">色彩空间转换</h1>
     </div>
+    <div class="gamut-control" role="group" aria-label="钳制色域">
+      <button type="button" class="gamut-btn" data-clip="auto" title="按当前显示器色域钳制">跟随显示器(<span id="display-gamut-name">sRGB</span>)</button>
+      <button type="button" class="gamut-btn" data-clip="srgb" title="以 sRGB 为钳制色域">sRGB</button>
+      <button type="button" class="gamut-btn" data-clip="p3" id="gamut-btn-p3" title="以 Display P3 为钳制色域">displayP3</button>
+      <button type="button" class="gamut-btn" data-clip="rec2020" title="以 Rec.2020 为钳制色域">Rec.2020</button>
+    </div>
     <div id="cpu-warn" style="display:none">
       正在使用 CPU 软绘制，性能受到显著影响。推荐使用支持 WebGL2 的浏览器。
     </div>

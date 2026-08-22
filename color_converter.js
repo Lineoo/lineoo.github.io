@@ -249,22 +249,93 @@ const IS_P3 = (() => {
                matchMedia('(color-gamut: p3)').matches;
     } catch { return false; }
 })();
-const CLIP_MODE = (() => {
+const IS_REC2020 = (() => {
+    try {
+        return CSS.supports('color', 'color(rec2020 1 0 0)') &&
+               matchMedia('(color-gamut: rec2020)').matches;
+    } catch { return false; }
+})();
+const CLIP_NAMES = { srgb: 'sRGB', p3: 'Display P3', rec2020: 'Rec.2020' };
+const DISPLAY_GAMUT = IS_REC2020 ? 'rec2020' : (IS_P3 ? 'p3' : 'srgb');
+const DISPLAY_GAMUT_LABEL = { srgb: 'sRGB', p3: 'P3 广色域', rec2020: 'Rec.2020 广色域' }[DISPLAY_GAMUT];
+
+// 浏览器是否支持以 Rec.2020 作为 WebGL 绘制缓冲色域（原生输出，无需经由 P3 近似）
+const CAN_REC2020_OUTPUT = (() => {
+    try {
+        const c = document.createElement('canvas');
+        const gl = c.getContext('webgl2', { drawingBufferColorSpace: 'rec2020' });
+        return !!(gl && gl.drawingBufferColorSpace === 'rec2020');
+    } catch { return false; }
+})();
+
+function getCS() {
+    if (CLIP_MODE === 'srgb') return 'srgb';
+    if (CLIP_MODE === 'rec2020' && CAN_REC2020_OUTPUT) return 'rec2020';
+    return IS_P3 ? 'display-p3' : 'srgb';
+}
+
+function resolveClip(choice) {
+    return choice === 'auto' ? DISPLAY_GAMUT : choice;
+}
+
+let CLIP_CHOICE = (() => {
     try {
         const p = new URLSearchParams(location.search);
         if (p.get('clip') === 'rec2020') return 'rec2020';
         if (p.get('clip') === 'srgb') return 'srgb';
         if (p.get('clip') === 'p3' && IS_P3) return 'p3';
     } catch {}
-    return IS_P3 ? 'p3' : 'srgb';
+    return 'auto';
 })();
-const CS = CLIP_MODE === 'srgb' ? 'srgb' : (IS_P3 ? 'display-p3' : 'srgb');
+let CLIP_MODE = resolveClip(CLIP_CHOICE);
+let CS = getCS();
 
-document.getElementById('gamut-info').textContent =
-    '显示器色域：' + (IS_P3 ? 'P3 广色域' : 'sRGB') +
-    '\u2003裁定标准：' + {srgb:'sRGB', p3:'Display P3', rec2020:'Rec.2020'}[CLIP_MODE] +
-    '\u2003输出：' + (CS === 'display-p3' ? 'Display P3' : 'sRGB') +
-    (CLIP_MODE === 'rec2020' ? '（Rec.2020 值经由 P3 近似显示）' : '');
+function updateGamutInfo() {
+    document.getElementById('gamut-info').textContent =
+        '显示器色域：' + DISPLAY_GAMUT_LABEL +
+        '\u2003裁定标准：' + CLIP_NAMES[CLIP_MODE] +
+        '\u2003输出：' + (CS === 'display-p3' ? 'Display P3' : (CS === 'rec2020' ? 'Rec.2020' : 'sRGB')) +
+        (CLIP_MODE === 'rec2020' && !CAN_REC2020_OUTPUT ? '（Rec.2020 值经由 P3 近似显示）' : '');
+}
+
+function updateGamutButtons() {
+    const p3Btn = document.getElementById('gamut-btn-p3');
+    if (p3Btn) {
+        p3Btn.disabled = !IS_P3;
+        p3Btn.title = IS_P3 ? '以 Display P3 为钳制色域' : '当前显示器不支持 Display P3 钳制';
+    }
+    const autoBtn = document.querySelector('.gamut-btn[data-clip="auto"]');
+    if (autoBtn) autoBtn.title = '按当前显示器色域钳制（' + DISPLAY_GAMUT_LABEL + '）';
+    document.querySelectorAll('.gamut-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.clip === CLIP_CHOICE);
+    });
+}
+
+function applyClipChoice(choice) {
+    CLIP_CHOICE = choice;
+    CLIP_MODE = resolveClip(choice);
+    CS = getCS();
+    updateGamutInfo();
+    updateGamutButtons();
+    try {
+        const u = new URL(location.href);
+        if (choice === 'auto') u.searchParams.delete('clip');
+        else u.searchParams.set('clip', choice);
+        history.replaceState(null, '', u);
+    } catch {}
+    // 重建 WebGL 渲染器，使其按新的钳制色域编译片元着色器
+    _gl = null;
+    _glFailed = false;
+    getGL();
+    drawAllPlanes();
+}
+
+document.getElementById('display-gamut-name').textContent = DISPLAY_GAMUT_LABEL;
+document.querySelectorAll('.gamut-btn').forEach(btn => {
+    btn.addEventListener('click', () => applyClipChoice(btn.dataset.clip));
+});
+updateGamutInfo();
+updateGamutButtons();
 
 class WebGLColorRenderer {
     constructor() {
@@ -298,8 +369,10 @@ class WebGLColorRenderer {
             fetch('shaders/wheel_template.frag').then(r => r.text()),
             fetch('shaders/bar_template.frag').then(r => r.text()),
         ]);
+        const dispFn = CLIP_MODE === 'rec2020' && CAN_REC2020_OUTPUT
+            ? 'srgbToRec2020' : (IS_P3 ? 'srgbToP3' : 'sRGBPassthrough');
         const clipSrc = await fetch('shaders/clip_' + CLIP_MODE + '.glsl').then(r => r.text())
-            .then(s => s.replace('__DISP__', IS_P3 ? 'srgbToP3' : 'sRGBPassthrough'));
+            .then(s => s.replace('__DISP__', dispFn));
         const spaceNames = ['srgb','srgb-linear','p3','rec2020','lms','oklab','oklch','hsl','hsv'];
         const polarSpaces = new Set(['hsl','hsv','oklch']);
 
@@ -386,12 +459,13 @@ function getGL() {
     if (_gl !== null) return _gl;
     try {
         _gl = new WebGLColorRenderer();
-        _gl.init().catch(e => {
-            console.warn('WebGL2 init failed:', e);
-            _gl = null; _glFailed = true;
-            document.getElementById('cpu-warn').style.display = '';
-        });
-        _gl.init().then(() => document.getElementById('cpu-warn').style.display = 'none');
+        _gl.init()
+            .then(() => document.getElementById('cpu-warn').style.display = 'none')
+            .catch(e => {
+                console.warn('WebGL2 init failed:', e);
+                _gl = null; _glFailed = true;
+                document.getElementById('cpu-warn').style.display = '';
+            });
     } catch (e) {
         _gl = null; _glFailed = true;
         document.getElementById('cpu-warn').style.display = '';

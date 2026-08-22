@@ -362,6 +362,45 @@ button.color-alert.invalid:hover {
     font-weight: 500;
 }
 
+.gamut-control {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.gamut-btn {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: var(--bg-card);
+    color: var(--fg-muted);
+    cursor: pointer;
+    box-shadow: 0 2px 6px var(--shadow);
+    transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.gamut-btn:hover:not(:disabled) {
+    background: var(--bg-card-hover);
+    color: var(--fg-muted-hover);
+    box-shadow: 0 2px 10px var(--shadow);
+}
+
+.gamut-btn.active {
+    background: var(--fg-muted);
+    color: var(--bg-card);
+    box-shadow: 0 2px 10px var(--shadow);
+}
+
+.gamut-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
 @media (prefers-color-scheme: dark) {
     :root {
         --bg: oklab(20% 0 0);
