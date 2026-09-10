@@ -167,6 +167,7 @@
         --agc-hover: #f0f0f0;
         --agc-curve: #4a90d9;
         --agc-level: #9acbff;
+        --agc-fill: #d6ebff;
         --agc-param: #ffd482;
         --agc-muted: #9494a8;
       }
@@ -178,6 +179,7 @@
           --agc-hover: #1a1a1a;
           --agc-curve: #7aa0d0;
           --agc-level: #1c62ad;
+          --agc-fill: #16324f;
           --agc-param: #aa7001;
           --agc-muted: #68687c;
         }
@@ -269,7 +271,8 @@
       .__vAGCSlider {
         -webkit-appearance: none;
         appearance: none;
-        width: 100%;
+        flex: 1;
+        min-width: 0;
         background: transparent;
       }
       .__vAGCSlider::-webkit-slider-runnable-track {
@@ -317,16 +320,32 @@
       }
       .__vAGCCanvas {
         display: block;
-        aspect-ratio: 16 / 9;
+        width: 100%;
         margin-top: 12px;
         border-radius: 6px;
         border: 1px solid var(--agc-border);
       }
-      .__vAGCSlider {
+      .__vAGCWeight {
+        aspect-ratio: 16 / 9;
+      }
+      .__vAGCLoudness {
+        aspect-ratio: 16 / 4;
+      }
+      .__vAGCRow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         margin-top: 12px;
       }
-      .__vAGCSlider + .__vAGCSlider {
+      .__vAGCRow + .__vAGCRow {
         margin-top: 4px;
+      }
+      .__vAGCLabel {
+        flex: 0 0 auto;
+        min-width: 48px;
+        text-align: right;
+        font-size: 12px;
+        color: var(--agc-muted);
       }
     `;
 
@@ -341,11 +360,12 @@
             <button id="__vAGCClose" title="关闭">×</button>
           </span>
         </div>
-        <canvas id="__vAGCCanvas" class="__vAGCCanvas"></canvas>
-        <input type="range" id="__vAGCLevel" class="__vAGCSlider" data-key="target" min="-30" max="-10" step="0.001">
-        <input type="range" id="__vAGCCurveU" class="__vAGCSlider __vAGCCurve" data-key="curveU" min="-40" max="-1" step="0.001">
-        <input type="range" id="__vAGCCurveV" class="__vAGCSlider __vAGCCurve" data-key="curveV" min="0.001" max="0.1" step="0.001">
-        <input type="range" id="__vAGCCurveW" class="__vAGCSlider __vAGCCurve" data-key="curveW" min="0.05" max="0.3" step="0.001">
+        <canvas id="__vAGCWeight" class="__vAGCCanvas __vAGCWeight"></canvas>
+        <canvas id="__vAGCLoudness" class="__vAGCCanvas __vAGCLoudness"></canvas>
+        <div class="__vAGCRow"><span class="__vAGCLabel">目标</span><input type="range" id="__vAGCLevel" class="__vAGCSlider" data-key="target" min="-30" max="-10" step="0.001"></div>
+        <div class="__vAGCRow"><span class="__vAGCLabel">曲线 U</span><input type="range" id="__vAGCCurveU" class="__vAGCSlider __vAGCCurve" data-key="curveU" min="-40" max="-1" step="0.001"></div>
+        <div class="__vAGCRow"><span class="__vAGCLabel">曲线 V</span><input type="range" id="__vAGCCurveV" class="__vAGCSlider __vAGCCurve" data-key="curveV" min="0.001" max="0.1" step="0.001"></div>
+        <div class="__vAGCRow"><span class="__vAGCLabel">指数</span><input type="range" id="__vAGCCurveW" class="__vAGCSlider __vAGCCurve" data-key="curveW" min="0.05" max="0.3" step="0.001"></div>
       </div>
     `;
 
@@ -365,7 +385,8 @@
         ui = {
             btn: document.getElementById('__vAGCButton'),
             panel: document.getElementById('__vAGCPanel'),
-            canvas: document.getElementById('__vAGCCanvas'),
+            weight: document.getElementById('__vAGCWeight'),
+            loudness: document.getElementById('__vAGCLoudness'),
             count: document.getElementById('__vAGCCount'),
             gain: document.getElementById('__vAGCGain'),
             level: document.getElementById('__vAGCLevel'),
@@ -391,7 +412,7 @@
             input.addEventListener('input', () => {
                 CONFIG[input.dataset.key] = parseFloat(input.value);
                 updateFill();
-                drawCurve();
+                drawCharts();
             });
             input.addEventListener('change', () => {
                 updateFill();
@@ -408,7 +429,7 @@
         ui.btn.addEventListener('click', () => {
             const show = ui.panel.style.display !== 'flex';
             ui.panel.style.display = show ? 'flex' : 'none';
-            if (show) drawCurve();
+            if (show) drawCharts();
         });
 
         ui.close.addEventListener('click', () => {
@@ -424,140 +445,193 @@
                 input.style.setProperty('--fill', pct + '%');
             }
             saveConfig();
-            drawCurve();
+            drawCharts();
         });
     }
 
-    function drawCurve() {
-        const canvas = ui.canvas;
+    function prepareCanvas(canvas) {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return null;
+        canvas.width = Math.floor(rect.width * dpr);
+        canvas.height = Math.floor(rect.height * dpr);
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, rect.width, rect.height);
+        return { ctx, width: rect.width, height: rect.height };
+    }
 
+    function drawCharts() {
         const balancer = [...activeChains.values()].find(b => b.active);
         if (!balancer) return;
+        drawWeightChart(balancer);
+        drawLoudnessChart(balancer);
+    }
 
-        const dpr = window.devicePixelRatio || 1;
-        const cssRect = canvas.getBoundingClientRect();
-        if (cssRect.width <= 0 || cssRect.height <= 0) return;
-        canvas.width = Math.floor(cssRect.width * dpr);
-        canvas.height = Math.floor(cssRect.height * dpr);
+    function drawWeightChart(balancer) {
+        const view = prepareCanvas(ui.weight);
+        if (!view) return;
+        const { ctx, width, height } = view;
 
-        const width = cssRect.width, height = cssRect.height;
         const wPadding = 10, hPadding = 20;
-
-        const limXNum = 200;
-        const limXMid = CONFIG.enabled ? CONFIG.target : balancer.current;
-        const limXMin = limXMid - 30, limXMax = limXMid + 20;
-
+        const limXMin = -25, limXMax = 25;
         const limYMin = 0, limYMax = 0.1;
 
-        const axisXLen = width - 2 * wPadding, axisXMin = wPadding, axisXMax = width - wPadding;
-        const axisYLen = height - 2 * hPadding, axisYMin = height - hPadding, axisYMax = hPadding;
+        const axisXMin = wPadding, axisXMax = width - wPadding;
+        const axisYMin = height - hPadding, axisYMax = hPadding;
+        const axisXLen = axisXMax - axisXMin, axisYLen = axisYMin - axisYMax;
+
+        const toX = err => axisXMin + ((err - limXMin) / (limXMax - limXMin)) * axisXLen;
+        const toY = w => axisYMin - ((w - limYMin) / (limYMax - limYMin)) * axisYLen;
+        const curveY = y => Math.max(axisYMax - height, Math.min(axisYMin + height, y));
+        const pointY = y => Math.max(axisYMax, Math.min(axisYMin, y));
 
         const cs = getComputedStyle(document.documentElement);
         const color = name => cs.getPropertyValue(name).trim();
-        const toX = loud => axisXMin + ((loud - limXMin) / (limXMax - limXMin)) * axisXLen;
-        const toY = weight => axisYMin - ((weight - limYMin) / (limYMax - limYMin)) * axisYLen;
+        const border = color('--agc-border');
+        const muted = color('--agc-muted');
+        const curve = color('--agc-curve');
+        const fill = color('--agc-fill');
 
-        const ctx = canvas.getContext('2d');
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.clearRect(0, 0, width, height);
+        // axis
+        ctx.strokeStyle = border;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(axisXMin, axisYMin); ctx.lineTo(axisXMax, axisYMin); ctx.stroke();
 
-        drawAxis(color('--agc-border'));
-        if (CONFIG.enabled) {
-            drawOrigin(color('--agc-border'));
-            drawBalanced(color('--agc-curve'));
-        } else {
-            drawBalanced(color('--agc-border'));
-            drawOrigin(color('--agc-curve'));
-        }
+        // x axis labels (boundaries only)
+        ctx.fillStyle = muted;
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'start';
+        ctx.fillText(limXMin.toFixed(1), axisXMin + 2, axisYMin + 12);
+        ctx.textAlign = 'end';
+        ctx.fillText(limXMax.toFixed(1), axisXMax - 2, axisYMin + 12);
 
-        function drawAxis(color) {
-            // axis
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(axisXMin, axisYMin); ctx.lineTo(axisXMax, axisYMin); ctx.stroke();
+        // zero reference
+        ctx.strokeStyle = border;
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath(); ctx.moveTo(toX(0), axisYMax); ctx.lineTo(toX(0), axisYMin); ctx.stroke();
+        ctx.setLineDash([]);
 
-            // axis label
-            ctx.fillStyle = color;
-            ctx.font = '10px sans-serif';
-            ctx.textAlign = 'start';
-            ctx.fillText(limXMin.toFixed(1), axisXMin + 2, axisYMin + 12);
-            ctx.textAlign = 'end';
-            ctx.fillText(limXMax.toFixed(1), axisXMax - 2, axisYMin + 12);
+        const err = balancer.instant - balancer.current;
+        const py = pointY(toY(balancer.weight(err)));
+        const limXNum = 200;
 
-            // weight curve standard point
-            const std = CONFIG.target + CONFIG.curveU;
-            const stdX = toX(std);
-            const stdY = toY(balancer.weight(std - CONFIG.target));
-            ctx.fillStyle = color;
-            ctx.beginPath(); ctx.arc(stdX, stdY, 3, 0, Math.PI * 2); ctx.fill();
-
-            // tau labels group
-            const drawTau = weight => {
-                const tauMax = Math.round(1 / Math.max(weight, 1e-6));
-                ctx.fillStyle = color;
-                ctx.font = '10px sans-serif';
-                ctx.textAlign = 'end';
-                ctx.fillText(`${tauMax} s`, axisXMax - 2, toY(weight) - 5);
-            };
-
-            drawTau(0.1);
-            drawTau(0.05);
-            drawTau(0.01);
-        }
-
-        function drawBalanced(color) {
-            // weight curve
+        // instantaneous coverage (center to current error)
+        const fillTo = Math.max(limXMin, Math.min(limXMax, err));
+        if (fillTo !== 0) {
             ctx.beginPath();
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 1;
+            ctx.moveTo(toX(0), axisYMin);
             for (let i = 0; i <= limXNum; i++) {
-                const loud = limXMin + (limXMax - limXMin) * i / limXNum;
-                const loudX = toX(loud);
-                const loudY = toY(balancer.weight(loud - CONFIG.target));
-                i === 0 ? ctx.moveTo(loudX, loudY) : ctx.lineTo(loudX, loudY);
+                const e = fillTo * i / limXNum;
+                ctx.lineTo(toX(e), curveY(toY(balancer.weight(e))));
             }
-            ctx.stroke();
-
-            // weight curve point
-            const point = balancer.instant - balancer.current + CONFIG.target;
-            const pointX = toX(point);
-            const pointY = toY(balancer.weight(point - CONFIG.target));
-            ctx.fillStyle = color;
-            ctx.beginPath(); ctx.arc(pointX, pointY, 3, 0, Math.PI * 2); ctx.fill();
-
-            // weight curve point label
-            const tau = Math.round(1 / Math.max(balancer.weight(point - CONFIG.target), 1e-6));
-            ctx.font = '10px sans-serif';
-            ctx.fillStyle = color;
-            ctx.textAlign = 'end';
-            ctx.fillText(tau > 360 ? "- s" : `${tau} s`, axisXMax - 2, pointY - 5);
-
-            // target loudness
-            const targetX = toX(CONFIG.target);
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(targetX, axisYMax); ctx.lineTo(targetX, axisYMin); ctx.stroke();
-
-            // target loudness label
-            ctx.font = '10px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = color;
-            ctx.fillText(`${CONFIG.target.toFixed(1)} LUFS`, targetX, axisYMin + 12);
+            ctx.lineTo(toX(fillTo), axisYMin);
+            ctx.closePath();
+            ctx.fillStyle = fill;
+            ctx.fill();
         }
 
-        function drawOrigin(color) {
-            // origin loudness
-            const originX = toX(balancer.current);
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(originX, axisYMax); ctx.lineTo(originX, axisYMin); ctx.stroke();
-
-            // origin loudness label
-            ctx.font = '10px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillStyle = color;
-            ctx.fillText(`${balancer.current.toFixed(1)} LUFS`, originX, axisYMax - 2);
+        // weight curve
+        ctx.beginPath();
+        ctx.strokeStyle = curve;
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= limXNum; i++) {
+            const e = limXMin + (limXMax - limXMin) * i / limXNum;
+            const x = toX(e), y = curveY(toY(balancer.weight(e)));
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
         }
+        ctx.stroke();
+
+        // curve reference point (curveU, v)
+        ctx.fillStyle = curve;
+        ctx.beginPath(); ctx.arc(toX(CONFIG.curveU), pointY(toY(balancer.weight(CONFIG.curveU))), 2.5, 0, Math.PI * 2); ctx.fill();
+
+        // axis unit
+        ctx.fillStyle = muted;
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'start';
+        ctx.fillText('dB', axisXMin + 2, axisYMax + 9);
+
+        // correction time reference (right edge)
+        ctx.fillStyle = muted;
+        ctx.textAlign = 'end';
+        for (const w of [0.1, 0.05, 0.01]) {
+            ctx.fillText(`${Math.round(1 / w)} s`, axisXMax - 2, pointY(toY(w)) - 5);
+        }
+
+        // instantaneous correction time (right edge)
+        const tau = Math.round(1 / Math.max(balancer.weight(err), 1e-6));
+        ctx.fillStyle = curve;
+        ctx.textAlign = 'end';
+        ctx.fillText(tau > 360 ? '- s' : `${tau} s`, axisXMax - 2, py - 5);
+    }
+
+    function drawLoudnessChart(balancer) {
+        const view = prepareCanvas(ui.loudness);
+        if (!view) return;
+        const { ctx, width, height } = view;
+
+        const wPadding = 10, hPadding = 16;
+        const span = 12;
+        const limXMid = CONFIG.enabled ? CONFIG.target : balancer.current;
+        const limXMin = limXMid - span, limXMax = limXMid + span;
+
+        const axisXMin = wPadding, axisXMax = width - wPadding;
+        const axisYMin = height - hPadding, axisYMax = hPadding;
+        const axisXLen = axisXMax - axisXMin;
+
+        const toX = loud => axisXMin + ((loud - limXMin) / (limXMax - limXMin)) * axisXLen;
+        const clampX = x => Math.max(axisXMin, Math.min(axisXMax, x));
+
+        const cs = getComputedStyle(document.documentElement);
+        const color = name => cs.getPropertyValue(name).trim();
+        const border = color('--agc-border');
+        const muted = color('--agc-muted');
+        const targetColor = CONFIG.enabled ? color('--agc-curve') : border;
+        const currentColor = CONFIG.enabled ? border : color('--agc-curve');
+
+        // axis
+        ctx.strokeStyle = border;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(axisXMin, axisYMin); ctx.lineTo(axisXMax, axisYMin); ctx.stroke();
+
+        // x axis labels (boundaries only)
+        ctx.fillStyle = muted;
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'start';
+        ctx.fillText(limXMin.toFixed(1), axisXMin + 2, axisYMin + 12);
+        ctx.textAlign = 'end';
+        ctx.fillText(limXMax.toFixed(1), axisXMax - 2, axisYMin + 12);
+
+        ctx.textAlign = 'start';
+        ctx.fillText('LUFS', axisXMin + 2, axisYMax + 9);
+
+        // target loudness
+        const targetX = clampX(toX(CONFIG.target));
+        ctx.strokeStyle = targetColor;
+        ctx.beginPath(); ctx.moveTo(targetX, axisYMax); ctx.lineTo(targetX, axisYMin); ctx.stroke();
+
+        // measured loudness
+        const currentX = clampX(toX(balancer.current));
+        ctx.strokeStyle = currentColor;
+        ctx.beginPath(); ctx.moveTo(currentX, axisYMax); ctx.lineTo(currentX, axisYMin); ctx.stroke();
+
+        // labels on the outer sides to avoid overlap
+        const targetLeft = targetX <= currentX;
+        const labelY = axisYMin - 4;
+        const margin = 58;
+        ctx.font = '10px sans-serif';
+
+        ctx.fillStyle = targetColor;
+        ctx.textAlign = targetLeft ? 'end' : 'start';
+        ctx.fillText(`${CONFIG.target.toFixed(1)} LUFS`, targetLeft ? targetX - 4 : targetX + 4, labelY);
+
+        const currentAlign = targetLeft ? 'start' : 'end';
+        let currentLabelX = targetLeft ? currentX + 4 : currentX - 4;
+        currentLabelX = currentAlign === 'end' ? Math.max(currentLabelX, margin) : Math.min(currentLabelX, width - margin);
+        ctx.fillStyle = currentColor;
+        ctx.textAlign = currentAlign;
+        ctx.fillText(`${balancer.current.toFixed(1)} LUFS`, currentLabelX, labelY);
     }
 
     function updatePanelContent() {
@@ -610,7 +684,7 @@
         if (!ui) return;
         updateButtonContent()
         if (ui.panel.style.display !== 'flex') return;
-        drawCurve()
+        drawCharts()
         updatePanelContent()
     }
 
